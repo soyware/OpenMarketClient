@@ -15,6 +15,9 @@ char g_sessionID[25];
 
 int main()
 {
+	setlocale(LC_ALL, "");
+	Log("MarketsBot v0.1\n");
+
 	curl_global_init(CURL_GLOBAL_ALL);
 	CURL* curl = curl_easy_init();
 	if (curl)
@@ -22,8 +25,6 @@ int main()
 		curl_easy_setopt(curl, CURLOPT_TIMEOUT, 20L);
 		curl_easy_setopt(curl, CURLOPT_IPRESOLVE, CURL_IPRESOLVE_V4);
 		curl_easy_setopt(curl, CURLOPT_FAILONERROR, 1L);
-
-		setlocale(LC_ALL, "");
 
 		bool writeconfig = !Config::Read();
 
