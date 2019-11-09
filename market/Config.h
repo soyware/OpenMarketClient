@@ -220,7 +220,8 @@ namespace Config
 				return false;
 			}
 
-			if (memcmp(strrchr(summary, '\n') - (sizeof(Config::successcheck) - 1), Config::successcheck, sizeof(Config::successcheck) - 1))
+			char* lastnewline = strrchr(summary, '\n');
+			if (!lastnewline || memcmp(lastnewline - (sizeof(Config::successcheck) - 1), Config::successcheck, sizeof(Config::successcheck) - 1))
 				std::cout << "wrong password\n";
 			else
 				break;
