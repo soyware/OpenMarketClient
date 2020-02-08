@@ -16,7 +16,7 @@ char g_sessionID[25];
 int main()
 {
 	setlocale(LC_ALL, "");
-	Log("MarketsBot v0.1\n");
+	Log("MarketsBot v0.1.2\n");
 
 	curl_global_init(CURL_GLOBAL_ALL);
 	CURL* curl = curl_easy_init();
@@ -26,9 +26,9 @@ int main()
 		curl_easy_setopt(curl, CURLOPT_IPRESOLVE, CURL_IPRESOLVE_V4);
 		curl_easy_setopt(curl, CURLOPT_FAILONERROR, 1L);
 
-		bool writeconfig = !Config::Read();
+		bool readcfg = Config::Read();
 
-		if (writeconfig)
+		if (!readcfg)
 			Config::Enter();
 
 		if (!SetCACert(curl) || !Guard::Sync(curl) || !Login::DoLogin(curl) || !Login::GetSessionId(curl))
@@ -38,7 +38,7 @@ int main()
 			return 1;
 		}
 
-		if (writeconfig)
+		if (!readcfg)
 		{
 			Login::GetSteamIdApiKey(curl);
 			Config::Write();
