@@ -24,7 +24,7 @@ All of those are encrypted and put into config after you enter them.
 Simply compile / download latest release, start the program and follow instructions.
 
 # Compile
-To compile you'll need libcurl and wolfssl
+To compile you'll need libcurl, wolfssl and rapidjson
 
 # Suggestions
 If you want to see something added simply open an issue
