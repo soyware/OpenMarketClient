@@ -93,7 +93,7 @@ namespace Market
 			}
 		}
 
-		std::cout << items.Size() << " listings(s)\n";
+		std::cout << items.Size() << " listing(s)\n";
 		return ITEM_STATUS_SELLING;
 	}
 
