@@ -31,12 +31,13 @@ namespace Guard
 			std::cout << "request failed\n";
 			return false;
 		}
+
 		curl_easy_setopt(curl, CURLOPT_TIMEOUT, 20L);
 
 		rapidjson::Document doc;
 		doc.Parse(data.data);
 
-		timeDiff = time(nullptr) - atoi(doc["response"]["server_time"].GetString());
+		timeDiff = time(nullptr) - atol(doc["response"]["server_time"].GetString());
 
 		std::cout << "ok\n";
 		return true;

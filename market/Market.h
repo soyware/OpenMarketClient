@@ -39,12 +39,12 @@ namespace Market
 		switch (market)
 		{
 		case MARKET_DOTA:
-			Log("Checking dota items...");
+			Log("Checking dota listings...");
 			strcpy_s(url, sizeof(url), "https://market.dota2.net/api/v2/items?key=");
 			break;
 
 		case MARKET_CSGO:
-			Log("Checking csgo items...");
+			Log("Checking csgo listings...");
 			strcpy_s(url, sizeof(url), "https://market.csgo.com/api/v2/items?key=");
 			break;
 		}
@@ -73,7 +73,7 @@ namespace Market
 		const rapidjson::Value& items = doc["items"];
 		if (items.IsNull())
 		{
-			std::cout << "no items\n";
+			std::cout << "none\n";
 			return ITEM_STATUS_SELLING;
 		}
 
@@ -93,7 +93,7 @@ namespace Market
 			}
 		}
 
-		std::cout << "selling " << items.Size() << " item(s)\n";
+		std::cout << items.Size() << " listings(s)\n";
 		return ITEM_STATUS_SELLING;
 	}
 
