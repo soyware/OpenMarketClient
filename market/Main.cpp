@@ -3,7 +3,7 @@
 #include "Config.h"
 #include "Curl.h"
 
-char g_sessionID[25];
+char g_sessionID[28];
 
 #include "Guard.h"
 #include "Login.h"
@@ -26,9 +26,9 @@ int main()
 		curl_easy_setopt(curl, CURLOPT_IPRESOLVE, CURL_IPRESOLVE_V4);
 		curl_easy_setopt(curl, CURLOPT_FAILONERROR, 1L);
 
-		bool readcfg = Config::Read();
+		bool readCfg = Config::Read();
 
-		if (!readcfg)
+		if (!readCfg)
 			Config::Enter();
 
 		if (!SetCACert(curl) || !Guard::Sync(curl) || !Login::DoLogin(curl) || !Login::GetSessionId(curl))
@@ -38,7 +38,7 @@ int main()
 			return 1;
 		}
 
-		if (!readcfg)
+		if (!readCfg)
 		{
 			Login::GetSteamIdApiKey(curl);
 			Config::Write();
@@ -72,7 +72,7 @@ int main()
 						offer["items"].Accept(writer);
 
 						// partner returned by market is sometimes a string, sometimes an int
-						char partner[11];
+						char partner[12];
 						if (offer["partner"].IsInt())
 							_itoa_s(offer["partner"].GetInt(), partner, sizeof(partner), 10);
 

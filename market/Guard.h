@@ -150,7 +150,7 @@ namespace Guard
 
 		char* escapedhash = curl_easy_escape(curl, (const char*)hash, hashlen);
 
-		char sztime[11];
+		char sztime[12];
 		_itoa_s(GetSteamTime(), sztime, sizeof(sztime), 10);
 
 		strcpy_s(out, outsize, "p=");
@@ -216,7 +216,7 @@ namespace Guard
 
 		Log("Accepting trade offer confirmation...");
 
-		char offerstring[26] = "data-creator=\"";
+		char offerstring[28] = "data-creator=\"";
 		strcat_s(offerstring, sizeof(offerstring), tradeofferid);
 
 		const char* creator = strstr(confirmations.data, offerstring);
@@ -276,7 +276,7 @@ namespace Guard
 
 		for (size_t i = 0; i < offercount; ++i)
 		{
-			char offerstring[26] = "data-creator=\"";
+			char offerstring[28] = "data-creator=\"";
 			strcat_s(offerstring, sizeof(offerstring), tradeofferids[i]);
 
 			const char* creator = strstr(confirmations.data, offerstring);

@@ -24,7 +24,7 @@ namespace Market
 	{
 		Log("Sending ping...");
 
-		char url[73] = "https://market.dota2.net/api/v2/ping?key=";
+		char url[76] = "https://market.dota2.net/api/v2/ping?key=";
 		strcat_s(url, sizeof(url), marketKey);
 		curl_easy_setopt(curl, CURLOPT_URL, url);
 		curl_easy_setopt(curl, CURLOPT_HTTPGET, 1L);
@@ -35,7 +35,7 @@ namespace Market
 
 	int CheckItems(CURL* curl, int market)
 	{
-		char url[74];
+		char url[76];
 		switch (market)
 		{
 		case MARKET_DOTA:
@@ -101,7 +101,7 @@ namespace Market
 	{
 		Log("Requesting trade offer...");
 
-		char url[87];
+		char url[88];
 		switch (market)
 		{
 		case MARKET_DOTA:
@@ -145,7 +145,7 @@ namespace Market
 	{
 		Log("Requesting details for trade offers...");
 
-		char url[94] = "https://market.csgo.com/api/v2/trade-request-give-p2p-all?key=";
+		char url[96] = "https://market.csgo.com/api/v2/trade-request-give-p2p-all?key=";
 		strcat_s(url, sizeof(url), Config::marketapikey);
 		curl_easy_setopt(curl, CURLOPT_URL, url);
 

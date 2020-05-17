@@ -1,12 +1,5 @@
 ﻿#pragma once
 
-#define WINVER 0x0601
-#define _WIN32_WINNT 0x0601
-#include <SDKDDKVer.h>
-
-#define WIN32_LEAN_AND_MEAN
-
-#include <Windows.h>
 #include <iostream>
 #include <conio.h>
 #include <thread>
@@ -28,6 +21,6 @@ using namespace std::chrono_literals;
 
 #pragma warning(pop)
 
-#define MARKET_SECRET_LEN 5
-#define OFFERID_LEN 11
-#define STEAMID64_LEN 18
+#define MARKET_SECRET_LEN 6
+#define OFFERID_LEN 12
+#define STEAMID64_LEN 20

@@ -7,7 +7,7 @@ namespace Offer
 	{
 		Log("Checking trade offer...");
 
-		char url[121] = "https://api.steampowered.com/IEconService/GetTradeOffer/v1/?key=";
+		char url[124] = "https://api.steampowered.com/IEconService/GetTradeOffer/v1/?key=";
 		strcat_s(url, sizeof(url), Config::steamapikey);
 		strcat_s(url, sizeof(url), "&tradeofferid=");
 		strcat_s(url, sizeof(url), offerId);
@@ -57,7 +57,7 @@ namespace Offer
 		strcat_s(url, sizeof(url), "accept");
 		curl_easy_setopt(curl, CURLOPT_URL, url);
 
-		char postFields[105] = "tradeofferid=";
+		char postFields[108] = "tradeofferid=";
 		strcat_s(postFields, sizeof(postFields), offerId);
 
 		strcat_s(postFields, sizeof(postFields), "&partner=");
@@ -95,7 +95,7 @@ namespace Offer
 	{
 		Log("Creating trade offer...");
 
-		char referer[77] = "https://steamcommunity.com/tradeoffer/new/?partner=";
+		char referer[80] = "https://steamcommunity.com/tradeoffer/new/?partner=";
 		strcat_s(referer, sizeof(referer), partner32);
 		strcat_s(referer, sizeof(referer), "&token=");
 		strcat_s(referer, sizeof(referer), token);
