@@ -1,76 +1,44 @@
 #pragma once
 
+#define OFFER_TOKEN_SIZE 9
+#define OFFER_MESSAGE_SIZE sizeof("ACIU ... /trade/3823362517/gijsH9EbZpE/")
+
 namespace Offer
 {
-	/*
-	bool Check(CURL* curl, const char* offerId, const char* secretCode)
-	{
-		Log("Checking trade offer...");
-
-		char url[124] = "https://api.steampowered.com/IEconService/GetTradeOffer/v1/?key=";
-		strcat_s(url, sizeof(url), Config::steamapikey);
-		strcat_s(url, sizeof(url), "&tradeofferid=");
-		strcat_s(url, sizeof(url), offerId);
-		curl_easy_setopt(curl, CURLOPT_URL, url);
-
-		CURLdata data;
-		curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void*)&data);
-
-		if (curl_easy_perform(curl) != CURLE_OK)
-		{
-			std::cout << "request failed\n";
-			return false;
-		}
-
-		rapidjson::Document doc;
-		doc.Parse(data.data);
-
-		if (doc["response"].ObjectEmpty())
-		{
-			std::cout << "invalid trade id\n";
-			return false;
-		}
-		else if (strncmp(doc["response"]["offer"]["message"].GetString(), secretCode, MARKET_SECRET_LEN - 1))
-		{
-			std::cout << "incorrect secret code\n";
-			return false;
-		}
-		else if (doc["response"]["offer"]["trade_offer_state"].GetInt() != 2)
-		{
-			std::cout << "inactive trade offer\n";
-			return false;
-		}
-
-		std::cout << "ok\n";
-		return true;
-	}
-	*/
-
 	bool Accept(CURL* curl, const char* offerId, const char* partner64)
 	{
 		Log("Accepting trade offer...");
 
-		char url[56] = "https://steamcommunity.com/tradeoffer/";
+		// 2 slashes on purpose
+		const size_t urlSz = sizeof("https://steamcommunity.com/tradeoffer//accept") - 1 + OFFER_ID_SIZE;
+		char url[urlSz] = "https://steamcommunity.com/tradeoffer/";
+
 		strcat_s(url, sizeof(url), offerId);
 		strcat_s(url, sizeof(url), "/");
 		curl_easy_setopt(curl, CURLOPT_REFERER, url);
+
 		strcat_s(url, sizeof(url), "accept");
 		curl_easy_setopt(curl, CURLOPT_URL, url);
 
-		char postFields[108] = "tradeofferid=";
+		const size_t postFieldsSz = sizeof("serverid=1"
+			"&captcha="
+			"&tradeofferid="
+			"&partner="
+			"&sessionid=") - 1 + OFFER_ID_SIZE - 1 + STEAMID64_SIZE - 1 + sizeof(Config::sessionid);
+
+		char postFields[postFieldsSz] = "serverid=1"
+			"&captcha="
+			"&tradeofferid=";
 		strcat_s(postFields, sizeof(postFields), offerId);
 
 		strcat_s(postFields, sizeof(postFields), "&partner=");
 		strcat_s(postFields, sizeof(postFields), partner64);
 
 		strcat_s(postFields, sizeof(postFields), "&sessionid=");
-		strcat_s(postFields, sizeof(postFields), g_sessionID);
+		strcat_s(postFields, sizeof(postFields), Config::sessionid);
 
-		strcat_s(postFields, sizeof(postFields), "&serverid=1&"
-			"captcha=");
-
-		CURLdata data;
-		curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void*)&data);
+		CURLdata response;
+		curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void*)&response);
 		curl_easy_setopt(curl, CURLOPT_POST, 1L);
 		curl_easy_setopt(curl, CURLOPT_POSTFIELDS, postFields);
 
@@ -81,9 +49,9 @@ namespace Offer
 
 		if (res != CURLE_OK)
 		{
-			long code;
-			curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &code);
-			std::cout << curl_easy_strerror(res) << " (" << code << ")\n";
+			long httpCode;
+			curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &httpCode);
+			std::cout << curl_easy_strerror(res) << " (" << httpCode << ")\n";
 			return false;
 		}
 
@@ -95,53 +63,70 @@ namespace Offer
 	{
 		Log("Creating trade offer...");
 
-		char referer[80] = "https://steamcommunity.com/tradeoffer/new/?partner=";
+		const size_t refererSz = sizeof("https://steamcommunity.com/tradeoffer/new/?partner=&token=") - 1 +
+			STEAMID32_SIZE - 1 + OFFER_TOKEN_SIZE;
+
+		char referer[refererSz] = "https://steamcommunity.com/tradeoffer/new/?partner=";
 		strcat_s(referer, sizeof(referer), partner32);
 		strcat_s(referer, sizeof(referer), "&token=");
 		strcat_s(referer, sizeof(referer), token);
 		curl_easy_setopt(curl, CURLOPT_REFERER, referer);
 
-		char postFields[1024];
-		sprintf_s(postFields, sizeof(postFields),
-			"partner=%llu&"
-			"trade_offer_create_params={\"trade_offer_access_token\":\"%s\"}&"
-			"tradeoffermessage=%s&"
-			"json_tradeoffer={\"newversion\":true,\"version\":2,\"me\":{\"assets\":%s,\"currency\":[],\"ready\":false},\"them\":{\"assets\":[],\"currency\":[],\"ready\":false}}&"
-			"sessionid=%s&"
-			"serverid=1&"
-			"captcha=",
-			76561197960265728 + atoi(partner32),
+		const size_t postFieldsSz = sizeof("partner="
+			"&trade_offer_create_params={\"trade_offer_access_token\":\"\"}"
+			"&tradeoffermessage="
+			"&json_tradeoffer={\"newversion\":true,\"version\":2,\"me\":{\"assets\":,\"currency\":[],\"ready\":false},\"them\":{\"assets\":[],\"currency\":[],\"ready\":false}}"
+			"&sessionid="
+			"&serverid=1"
+			"&captcha=") - 1 + 
+			STEAMID64_SIZE - 1 + OFFER_TOKEN_SIZE - 1 + OFFER_MESSAGE_SIZE - 1 + strlen(items) + sizeof(Config::sessionid);
+
+		char* postFields = new char[postFieldsSz];
+		sprintf_s(postFields, postFieldsSz,
+			"partner=%llu"
+			"&trade_offer_create_params={\"trade_offer_access_token\":\"%s\"}"
+			"&tradeoffermessage=%s"
+			"&json_tradeoffer={\"newversion\":true,\"version\":2,\"me\":{\"assets\":%s,\"currency\":[],\"ready\":false},\"them\":{\"assets\":[],\"currency\":[],\"ready\":false}}"
+			"&sessionid=%s"
+			"&serverid=1"
+			"&captcha=",
+			SteamID32To64(atol(partner32)),
 			token,
 			message,
 			items,
-			g_sessionID);
+			Config::sessionid);
 
-		CURLdata data;
-		curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void*)&data);
+		CURLdata response;
+		curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void*)&response);
 		curl_easy_setopt(curl, CURLOPT_POST, 1L);
 		curl_easy_setopt(curl, CURLOPT_POSTFIELDS, postFields);
 		curl_easy_setopt(curl, CURLOPT_URL, "https://steamcommunity.com/tradeoffer/new/send");
 
 		CURLcode res = curl_easy_perform(curl);
+
+		delete[] postFields;
 		curl_easy_setopt(curl, CURLOPT_REFERER, NULL);
 
 		if (res != CURLE_OK)
 		{
-			std::cout << "request failed\n";
+			long httpCode;
+			curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &httpCode);
+			std::cout << curl_easy_strerror(res) << " (" << httpCode << ")\n";
 			return false;
 		}
 
-		rapidjson::Document doc;
-		doc.Parse(data.data);
+		rapidjson::Document parsed;
+		parsed.Parse(response.data);
 
-		rapidjson::Value::ConstMemberIterator tradeofferid = doc.FindMember("tradeofferid");
-		if (tradeofferid == doc.MemberEnd())
+		rapidjson::Value::ConstMemberIterator tradeofferid = parsed.FindMember("tradeofferid");
+		if (tradeofferid == parsed.MemberEnd())
 		{
 			std::cout << "request unsucceeded\n";
 			return false;
 		}
 
-		strcpy_s(outOfferId, OFFERID_LEN, tradeofferid->value.GetString());
+		strcpy_s(outOfferId, OFFER_ID_SIZE, tradeofferid->value.GetString());
+
 		std::cout << "ok\n";
 		return true;
 	}

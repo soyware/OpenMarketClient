@@ -2,84 +2,107 @@
 
 #include "Captcha.h"
 
-#define MODULUS_SIZE 256 // raw bytes
-#define EXPONENT_SIZE 3 // raw bytes
-#define TIMESTAMP_SIZE 13
+#define MODULUS_LEN 256
+#define EXPONENT_LEN 3
+#define TIMESTAMP_LEN 13
 
 namespace Login
 {
-	bool GetRSAPublicKey(CURL* curl, const char* escUsername, char* outHexModulus, char* outHexExponent, char* outTimestamp)
+	bool GetRSAPublicKey(CURL* curl, const char* escUsername, byte* outHexModulus, byte* outHexExponent, char* outTimestamp)
 	{
-		Log("Receiving RSA public key...");
+		Log("Getting RSA public key...");
 
-		char postField[48] = "username=";
-		strcat_s(postField, sizeof(postField), escUsername);
+		const size_t postFieldSz = sizeof("username=") + strlen(escUsername);
+		char* postField = new char[postFieldSz];
 
-		CURLdata data;
-		curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void*)&data);
-		curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, curl_write_function);
+		strcpy_s(postField, postFieldSz, "username=");
+		strcat_s(postField, postFieldSz, escUsername);
+
+		CURLdata response;
+		curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void*)&response);
+		curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, &curl_write_function);
 		curl_easy_setopt(curl, CURLOPT_POST, 1L);
 		curl_easy_setopt(curl, CURLOPT_POSTFIELDS, postField);
 		curl_easy_setopt(curl, CURLOPT_URL, "https://steamcommunity.com/login/getrsakey/");
 
-		if (curl_easy_perform(curl) != CURLE_OK)
+		CURLcode res = curl_easy_perform(curl);
+
+		delete[] postField;
+
+		if (res != CURLE_OK)
 		{
 			std::cout << "request failed\n";
 			return false;
 		}
 
-		rapidjson::Document doc;
-		doc.Parse(data.data);
+		rapidjson::Document parsed;
+		parsed.Parse(response.data);
 
-		if (!doc["success"].GetBool())
+		if (!parsed["success"].GetBool())
 		{
 			std::cout << "request unsucceeded\n";
 			return false;
 		}
 
-		strcpy_s(outHexModulus, MODULUS_SIZE * 2 + 1, doc["publickey_mod"].GetString());
-		strcpy_s(outHexExponent, EXPONENT_SIZE * 2 + 1, doc["publickey_exp"].GetString());
-		strcpy_s(outTimestamp, TIMESTAMP_SIZE, doc["timestamp"].GetString());
+		memcpy(outHexModulus, parsed["publickey_mod"].GetString(), MODULUS_LEN * 2);
+		memcpy(outHexExponent, parsed["publickey_exp"].GetString(), EXPONENT_LEN * 2);
+		strcpy_s(outTimestamp, TIMESTAMP_LEN + 1, parsed["timestamp"].GetString());
 
 		std::cout << "ok\n";
 		return true;
 	}
 
-	bool EncryptPassword(const char* password, char* out, word32* outSize, const char* hexModulus, const char* hexExponent)
+	int EncryptPassword(const char* password, byte* out, word32* outSize, const byte* hexModulus, const byte* hexExponent)
 	{
 		Log("Encrypting password...");
 
-		byte modulus[MODULUS_SIZE];
-		byte exponent[EXPONENT_SIZE];
-		size_t modLen = sizeof(modulus);
-		size_t expLen = sizeof(exponent);
-		RsaKey pubKey;
+		byte modulus[MODULUS_LEN];
+		byte exponent[EXPONENT_LEN];
+		size_t modSz = sizeof(modulus);
+		size_t expSz = sizeof(exponent);
 
-		if (Base16_Decode((const byte*)hexModulus, MODULUS_SIZE * 2, modulus, &modLen) ||
-			Base16_Decode((const byte*)hexExponent, EXPONENT_SIZE * 2, exponent, &expLen) ||
-			wc_InitRsaKey(&pubKey, NULL) ||
-			wc_RsaPublicKeyDecodeRaw(modulus, modLen, exponent, expLen, &pubKey))
+		if (Base16_Decode(hexModulus, MODULUS_LEN * 2, modulus, &modSz) ||
+			Base16_Decode(hexExponent, EXPONENT_LEN * 2, exponent, &expSz))
 		{
+			std::cout << "base16 decoding failed\n";
+			return false;
+		}
+
+		RsaKey pubKey;
+		if (wc_InitRsaKey(&pubKey, NULL))
+		{
+			std::cout << "rsa init failed\n";
+			return false;
+		}
+
+		if (wc_RsaPublicKeyDecodeRaw(modulus, modSz, exponent, expSz, &pubKey))
+		{
+			wc_FreeRsaKey(&pubKey);
 			std::cout << "public key decoding failed\n";
 			return false;
 		}
 
 		WC_RNG rng;
-		byte rsaPass[MODULUS_SIZE];
-		int rsaPassLen;
-
-		if (wc_InitRng(&rng) ||
-			(0 > (rsaPassLen = wc_RsaPublicEncrypt((const byte*)password, strlen(password), rsaPass, sizeof(rsaPass), &pubKey, &rng))) ||
-			Base64_Encode_NoNl(rsaPass, rsaPassLen, (byte*)out, outSize))
+		if (wc_InitRng(&rng))
 		{
-			//char err[WOLFSSL_MAX_ERROR_SZ];
-			//wc_ErrorString(ret, err);
-			std::cout << "encryption failed\n";
+			wc_FreeRsaKey(&pubKey);
+			std::cout << "rng init failed\n";
 			return false;
 		}
 
+		byte rsaPass[MODULUS_LEN];
+		int rsaPassSz = wc_RsaPublicEncrypt((const byte*)password, strlen(password), rsaPass, sizeof(rsaPass), &pubKey, &rng);
+
+		bool encryptionFailed = ((rsaPassSz < 0) || Base64_Encode_NoNl(rsaPass, rsaPassSz, out, outSize));
+
 		wc_FreeRng(&rng);
 		wc_FreeRsaKey(&pubKey);
+
+		if (encryptionFailed)
+		{
+			std::cout << "fail\n";
+			return false;
+		}
 
 		std::cout << "ok\n";
 		return true;
@@ -88,20 +111,21 @@ namespace Login
 	bool DoLogin(CURL* curl, const char* newCaptchaGid = nullptr)
 	{
 		char* escUsername = curl_easy_escape(curl, Config::username, 0);
-		char rsaModulus[MODULUS_SIZE * 2 + 1];
-		char rsaExponent[EXPONENT_SIZE * 2 + 1];
-		char rsaTimestamp[TIMESTAMP_SIZE];
+		byte rsaModulus[MODULUS_LEN * 2];
+		byte rsaExponent[EXPONENT_LEN * 2];
+		char rsaTimestamp[TIMESTAMP_LEN + 1];
 
 		if (!GetRSAPublicKey(curl, escUsername, rsaModulus, rsaExponent, rsaTimestamp))
 			return false;
 
-		char encryptedPass[int(MODULUS_SIZE * 1.5f)];
-		size_t encryptedPassLen = sizeof(encryptedPass);
+		byte encryptedPass[PlainToBase64Size(MODULUS_LEN, WC_NO_NL_ENC)];
+		word32 encryptedPassLen = sizeof(encryptedPass);
+
 		if (!EncryptPassword(Config::password, encryptedPass, &encryptedPassLen, rsaModulus, rsaExponent))
 			return false;
 
 		char captchaGid[CAPTCHA_GID_SIZE];
-		char captchaText[8] = "";
+		char captchaText[CAPTCHA_ANSWER_SIZE] = "";
 		if (!newCaptchaGid)
 		{
 			if (!Captcha::Refresh(curl, captchaGid))
@@ -134,41 +158,40 @@ namespace Login
 			return false;
 		}
 
-		char* escEncryptedPass = curl_easy_escape(curl, encryptedPass, encryptedPassLen);
+		char* escEncryptedPass = curl_easy_escape(curl, (const char*)encryptedPass, encryptedPassLen);
 		char* escCaptchaText = curl_easy_escape(curl, captchaText, 0);
 
-		char postFields[640] = "username=";
-		strcat_s(postFields, sizeof(postFields), escUsername);
+		std::string postFields("emailauth="
+			"&loginfriendlyname="
+			"&emailsteamid="
+			"&remember_login=true"
+			"&username=");
+		postFields.append(escUsername);
 
-		strcat_s(postFields, sizeof(postFields), "&password=");
-		strcat_s(postFields, sizeof(postFields), escEncryptedPass);
+		postFields.append("&password=");
+		postFields.append(escEncryptedPass);
 
-		strcat_s(postFields, sizeof(postFields), "&twofactorcode=");
-		strcat_s(postFields, sizeof(postFields), twoFactorCode);
+		postFields.append("&twofactorcode=");
+		postFields.append(twoFactorCode);
 
-		strcat_s(postFields, sizeof(postFields), "&rsatimestamp=");
-		strcat_s(postFields, sizeof(postFields), rsaTimestamp);
+		postFields.append("&rsatimestamp=");
+		postFields.append(rsaTimestamp);
 
-		strcat_s(postFields, sizeof(postFields), "&captchagid=");
-		strcat_s(postFields, sizeof(postFields), captchaGid);
+		postFields.append("&captchagid=");
+		postFields.append(captchaGid);
 
-		strcat_s(postFields, sizeof(postFields), "&captcha_text=");
-		strcat_s(postFields, sizeof(postFields), escCaptchaText);
-
-		strcat_s(postFields, sizeof(postFields), "&emailauth=&"
-			"loginfriendlyname=&"
-			"emailsteamid=&"
-			"remember_login=false");
+		postFields.append("&captcha_text=");
+		postFields.append(escCaptchaText);
 
 		curl_free(escUsername);
 		curl_free(escEncryptedPass);
 		curl_free(escCaptchaText);
 
-		CURLdata data;
-		curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void*)&data);
-		curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, curl_write_function);
+		CURLdata response;
+		curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void*)&response);
+		curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, &curl_write_function);
 		curl_easy_setopt(curl, CURLOPT_POST, 1L);
-		curl_easy_setopt(curl, CURLOPT_POSTFIELDS, postFields);
+		curl_easy_setopt(curl, CURLOPT_POSTFIELDS, postFields.c_str());
 		curl_easy_setopt(curl, CURLOPT_URL, "https://steamcommunity.com/login/dologin/");
 
 		if (curl_easy_perform(curl) != CURLE_OK)
@@ -177,26 +200,26 @@ namespace Login
 			return false;
 		}
 
-		rapidjson::Document doc;
-		doc.Parse(data.data);
+		rapidjson::Document parsed;
+		parsed.Parse(response.data);
 
-		if (!doc["success"].GetBool())
+		if (!parsed["success"].GetBool())
 		{
-			rapidjson::Value::ConstMemberIterator requiresTwoFactor = doc.FindMember("requires_twofactor");
-			if (requiresTwoFactor != doc.MemberEnd() && requiresTwoFactor->value.GetBool())
+			rapidjson::Value::ConstMemberIterator requiresTwoFactor = parsed.FindMember("requires_twofactor");
+			if (requiresTwoFactor != parsed.MemberEnd() && requiresTwoFactor->value.GetBool())
 			{
 				std::cout << "wrong two factor code\n";
 				return false;
 			}
 
-			rapidjson::Value::ConstMemberIterator captchaNeeded = doc.FindMember("captcha_needed");
-			if (captchaNeeded != doc.MemberEnd() && captchaNeeded->value.GetBool())
+			rapidjson::Value::ConstMemberIterator captchaNeeded = parsed.FindMember("captcha_needed");
+			if (captchaNeeded != parsed.MemberEnd() && captchaNeeded->value.GetBool())
 			{
 				std::cout << "wrong captcha\n";
-				return DoLogin(curl, doc["captcha_gid"].GetString());
+				return DoLogin(curl, parsed["captcha_gid"].GetString());
 			}
 
-			std::cout << "steam answered: " << doc["message"].GetString() << '\n';
+			std::cout << "recieved response: " << parsed["message"].GetString() << '\n';
 			return false;
 		}
 
@@ -204,9 +227,9 @@ namespace Login
 		return true;
 	}
 
-	bool GetSessionId(CURL* curl)
+	bool GetSteamInfo(CURL* curl)
 	{
-		Log("Getting session id...");
+		Log("Getting steam info...");
 
 		curl_slist* cookies;
 		if ((curl_easy_getinfo(curl, CURLINFO_COOKIELIST, &cookies) != CURLE_OK) || !cookies)
@@ -222,10 +245,26 @@ namespace Login
 		if (!sessionId)
 		{
 			curl_slist_free_all(cookies);
-			std::cout << "not found\n";
+			std::cout << "sessionid not found\n";
 			return false;
 		}
-		strcpy_s(g_sessionID, sizeof(g_sessionID), strrchr(sessionId->data, '\t') + 1);
+		strcpy_s(Config::sessionid, sizeof(Config::sessionid), strrchr(sessionId->data, '\t') + 1);
+
+		if (!Config::sessionid[0])
+		{
+			curl_slist* steamId = cookies;
+			while (steamId && !strstr(steamId->data, "\tsteamLoginSecure\t"))
+				steamId = steamId->next;
+
+			if (!steamId)
+			{
+				curl_slist_free_all(cookies);
+				std::cout << "steamid not found\n";
+				return false;
+			}
+			const char* valuestart = strrchr(steamId->data, '\t') + 1;
+			strncpy_s(Config::steamid64, sizeof(Config::steamid64), valuestart, (strchr(valuestart, '%') - valuestart));
+		}
 
 		curl_slist_free_all(cookies);
 
@@ -233,33 +272,11 @@ namespace Login
 		return true;
 	}
 
-	bool GetSteamIdApiKey(CURL* curl)
+	/*
+	bool GetSteamApiKey(CURL* curl)
 	{
-		Log("Getting steamid and api-key...");
+		Log("Getting steam api key...");
 
-		curl_slist* cookies;
-		if ((curl_easy_getinfo(curl, CURLINFO_COOKIELIST, &cookies) != CURLE_OK) || !cookies)
-		{
-			std::cout << "fail\n";
-			return false;
-		}
-
-		curl_slist* steamId = cookies;
-		while (steamId && !strstr(steamId->data, "\tsteamLoginSecure\t"))
-			steamId = steamId->next;
-
-		if (!steamId)
-		{
-			curl_slist_free_all(cookies);
-			std::cout << "steamid not found\n";
-			return false;
-		}
-		const char* valuestart = strrchr(steamId->data, '\t') + 1;
-		strncpy_s(Config::steamid64, sizeof(Config::steamid64), valuestart, (strchr(valuestart, '%') - valuestart));
-
-		curl_slist_free_all(cookies);
-
-		/*
 		CURLdata apipage;
 		curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void*)&apipage);
 		curl_easy_setopt(curl, CURLOPT_URL, "https://steamcommunity.com/dev/apikey");
@@ -267,7 +284,7 @@ namespace Login
 
 		if (curl_easy_perform(curl) != CURLE_OK)
 		{
-			std::cout << "apikey request failed\n";
+			std::cout << "request failed\n";
 			return false;
 		}
 
@@ -290,23 +307,23 @@ namespace Login
 
 			if (curl_easy_perform(curl) != CURLE_OK)
 			{
-				std::cout << "register apikey request failed\n";
+				std::cout << "register request failed\n";
 				return false;
 			}
 
 			const char* keystart2 = strstr(registerpage.data, ">Key: ");
 			if (!keystart2)
 			{
-				std::cout << "apikey registration failed\n";
+				std::cout << "fail\n";
 				return false;
 			}
 
 			keystart2 += sizeof(">Key: ") - 1;
 			strncpy_s(Config::steamapikey, sizeof(Config::steamapikey), keystart2, (strchr(keystart2, '<') - keystart2));
 		}
-		*/
 
 		std::cout << "ok\n";
 		return true;
 	}
+	*/
 }

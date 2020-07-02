@@ -20,104 +20,127 @@ enum MARKET_TYPE
 
 namespace Market
 {
-	void Ping(CURL* curl, const char* marketKey)
-	{
-		Log("Sending ping...");
+	rapidjson::SizeType prevItemCount[MARKET_COUNT];
 
-		char url[76] = "https://market.dota2.net/api/v2/ping?key=";
+	const char* marketNames[] =
+	{
+		"DOTA",
+		"CSGO"
+	};
+
+	void Init()
+	{
+		for (size_t i = 0; i < std::size(prevItemCount); ++i)
+			prevItemCount[i] = (rapidjson::SizeType)-1;
+	}
+
+	bool Ping(CURL* curl, const char* marketKey)
+	{
+		const size_t urlSz = sizeof("https://market.dota2.net/api/v2/ping?key=") - 1 + sizeof(Config::marketApiKey);
+
+		char url[urlSz] = "https://market.dota2.net/api/v2/ping?key=";
 		strcat_s(url, sizeof(url), marketKey);
+
 		curl_easy_setopt(curl, CURLOPT_URL, url);
 		curl_easy_setopt(curl, CURLOPT_HTTPGET, 1L);
 		curl_easy_setopt(curl, CURLOPT_NOBODY, 1L);
 
-		std::cout << ((curl_easy_perform(curl) == CURLE_OK) ? "ok" : "fail") << '\n';
+		return (curl_easy_perform(curl) == CURLE_OK);
 	}
 
 	int CheckItems(CURL* curl, int market)
 	{
-		char url[76];
+		const size_t urlSz = sizeof("https://market.dota2.net/api/v2/items?key=") - 1 + sizeof(Config::marketApiKey);
+
+		char url[urlSz];
 		switch (market)
 		{
 		case MARKET_DOTA:
-			Log("Checking dota listings...");
 			strcpy_s(url, sizeof(url), "https://market.dota2.net/api/v2/items?key=");
 			break;
 
 		case MARKET_CSGO:
-			Log("Checking csgo listings...");
 			strcpy_s(url, sizeof(url), "https://market.csgo.com/api/v2/items?key=");
 			break;
 		}
-		strcat_s(url, sizeof(url), Config::marketapikey);
+		strcat_s(url, sizeof(url), Config::marketApiKey);
+
 		curl_easy_setopt(curl, CURLOPT_URL, url);
 		curl_easy_setopt(curl, CURLOPT_NOBODY, 0L);
 
-		CURLdata data;
-		curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void*)&data);
+		CURLdata response;
+		curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void*)&response);
 
 		if (curl_easy_perform(curl) != CURLE_OK)
-		{
-			std::cout << "request failed\n";
 			return 0;
-		}
 
-		rapidjson::Document doc;
-		doc.Parse(data.data);
+		rapidjson::Document parsed;
+		parsed.Parse(response.data);
 
-		if (!doc["success"].GetBool())
-		{
-			std::cout << "request unsucceeded\n";
+		if (!parsed["success"].GetBool())
 			return 0;
-		}
 
-		const rapidjson::Value& items = doc["items"];
-		if (items.IsNull())
-		{
-			std::cout << "none\n";
-			return ITEM_STATUS_SELLING;
-		}
+		int ret = ITEM_STATUS_SELLING;
 
-		for (rapidjson::SizeType i = 0; i < items.Size(); ++i)
+		const rapidjson::Value& items = parsed["items"];
+		rapidjson::SizeType itemsCount = (items.IsNull() ? 0 : items.Size());
+
+		for (rapidjson::SizeType i = 0; i < itemsCount; ++i)
 		{
-			// status is a character
-			int status = items[i]["status"].GetString()[0] - '0';
-			if (status == ITEM_STATUS_GIVE)
+			// returned status is a character
+			int status = (items[i]["status"].GetString()[0] - '0');
+
+			if (status == ITEM_STATUS_GIVE || status == ITEM_STATUS_TAKE)
 			{
-				std::cout << "sold\n";
-				return ITEM_STATUS_GIVE;
-			}
-			else if (status == ITEM_STATUS_TAKE)
-			{
-				std::cout << "bought\n";
-				return ITEM_STATUS_TAKE;
+				const char* name = items[i]["market_hash_name"].GetString();
+
+				if (ret == ITEM_STATUS_SELLING)
+				{
+					ret = status;
+					Log(marketNames[market], ": ", ((status == ITEM_STATUS_GIVE) ? "Sold" : "Bought"), " \"", name, '\"');
+				}
+				else
+					std::cout << ", \"" << name << '\"';
 			}
 		}
 
-		std::cout << items.Size() << " listing(s)\n";
-		return ITEM_STATUS_SELLING;
+		if (ret == ITEM_STATUS_SELLING)
+		{
+			if (prevItemCount[market] != itemsCount)
+			{
+				prevItemCount[market] = itemsCount;
+				Log(marketNames[market], ": ", itemsCount, " listing(s)\n");
+			}
+		}
+		else
+			std::cout << '\n';
+
+		return ret;
 	}
 
-	bool RequestOffer(CURL* curl, int market, bool take, char* outOfferId, char* outPartner64/*, char* outSecret*/)
+	bool RequestTakeDetails(CURL* curl, int market, char* outOfferId, char* outPartner64/*, char* outSecret*/)
 	{
-		Log("Requesting trade offer...");
+		Log("Requesting details to recieve item...");
 
-		char url[88];
+		const size_t urlSz = sizeof("https://market.dota2.net/api/v2/trade-request-take?key=") - 1 + sizeof(Config::marketApiKey);
+
+		char url[urlSz];
 		switch (market)
 		{
 		case MARKET_DOTA:
-			strcpy_s(url, sizeof(url), take ? "https://market.dota2.net/api/v2/trade-request-take?key=" :
-				"https://market.dota2.net/api/v2/trade-request-give?key=");
+			strcpy_s(url, sizeof(url), "https://market.dota2.net/api/v2/trade-request-take?key=");
 			break;
 
 		case MARKET_CSGO:
 			strcpy_s(url, sizeof(url), "https://market.csgo.com/api/v2/trade-request-take?key=");
 			break;
 		}
-		strcat_s(url, sizeof(url), Config::marketapikey);
+		strcat_s(url, sizeof(url), Config::marketApiKey);
+
 		curl_easy_setopt(curl, CURLOPT_URL, url);
 
-		CURLdata data;
-		curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void*)&data);
+		CURLdata response;
+		curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void*)&response);
 
 		if (curl_easy_perform(curl) != CURLE_OK)
 		{
@@ -125,32 +148,35 @@ namespace Market
 			return false;
 		}
 
-		rapidjson::Document doc;
-		doc.Parse(data.data);
+		rapidjson::Document parsed;
+		parsed.Parse(response.data);
 
-		if (!doc["success"].GetBool())
+		if (!parsed["success"].GetBool())
 		{
 			std::cout << "request unsucceeded\n";
 			return false;
 		}
 
-		strcpy_s(outOfferId, OFFERID_LEN, doc["trade"].GetString());
-		strncpy_s(outPartner64, STEAMID64_LEN, &doc["profile"].GetString()[36], (STEAMID64_LEN - 1));
-		//strcpy_s(outSecret, MARKET_SECRET_LEN, doc["secret"].GetString());
+		strcpy_s(outOfferId, OFFER_ID_SIZE, parsed["trade"].GetString());
+		strncpy_s(outPartner64, STEAMID64_SIZE, &parsed["profile"].GetString()[36], (STEAMID64_SIZE - 1));
+		//strcpy_s(outSecret, MARKET_SECRET_SIZE, doc["secret"].GetString());
+		
 		std::cout << "ok\n";
 		return true;
 	}
 
-	bool RequestDetails(CURL* curl, rapidjson::Document* outDoc)
+	bool RequestGiveDetails(CURL* curl, rapidjson::Document* outDoc)
 	{
-		Log("Requesting details for trade offers...");
+		Log("Requesting details to send items...");
 
-		char url[96] = "https://market.csgo.com/api/v2/trade-request-give-p2p-all?key=";
-		strcat_s(url, sizeof(url), Config::marketapikey);
+		const size_t urlSz = sizeof("https://market.csgo.com/api/v2/trade-request-give-p2p-all?key=") - 1 + sizeof(Config::marketApiKey);
+		char url[urlSz] = "https://market.csgo.com/api/v2/trade-request-give-p2p-all?key=";
+		strcat_s(url, sizeof(url), Config::marketApiKey);
+
 		curl_easy_setopt(curl, CURLOPT_URL, url);
 
-		CURLdata data;
-		curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void*)&data);
+		CURLdata response;
+		curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void*)&response);
 
 		if (curl_easy_perform(curl) != CURLE_OK)
 		{
@@ -158,13 +184,13 @@ namespace Market
 			return false;
 		}
 
-		outDoc->Parse(data.data);
+		outDoc->Parse(response.data);
 
 		if (!(*outDoc)["success"].GetBool())
 		{
 			rapidjson::Value::ConstMemberIterator error = outDoc->FindMember("error");
 			if (error != outDoc->MemberEnd() && !strcmp(error->value.GetString(), "nothing"))
-				std::cout << "nothing new\n";
+				std::cout << "nothing\n";
 			else
 				std::cout << "request unsucceeded\n";
 

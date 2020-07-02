@@ -2,107 +2,144 @@
 #include "Helpers.h"
 #include "Config.h"
 #include "Curl.h"
-
-char g_sessionID[28];
-
 #include "Guard.h"
 #include "Login.h"
 #include "Offer.h"
 #include "Market.h"
 
 // TODO:
-// import sda maFile
+// linux
+// dont save password, save cookies? + check if marketapikey is valid 
+// release steam guard file at separate repo?
 
 int main()
 {
 	setlocale(LC_ALL, "");
-	Log("MarketsBot v0.1.2\n");
+	Log("MarketsBot v0.2\n");
 
-	curl_global_init(CURL_GLOBAL_ALL);
-	CURL* curl = curl_easy_init();
-	if (curl)
+	CURL* curl = nullptr;
+	if (curl_global_init(CURL_GLOBAL_ALL) || !(curl = curl_easy_init()))
 	{
-		curl_easy_setopt(curl, CURLOPT_TIMEOUT, 20L);
-		curl_easy_setopt(curl, CURLOPT_IPRESOLVE, CURL_IPRESOLVE_V4);
-		curl_easy_setopt(curl, CURLOPT_FAILONERROR, 1L);
+		Log("Libcurl init failed\n");
+		curl_easy_cleanup(curl);
+		curl_global_cleanup();
+		Pause();
+		return 1;
+	}
 
-		bool readCfg = Config::Read();
+	curl_easy_setopt(curl, CURLOPT_TIMEOUT, 20L);
+	curl_easy_setopt(curl, CURLOPT_IPRESOLVE, CURL_IPRESOLVE_V4);
+	curl_easy_setopt(curl, CURLOPT_FAILONERROR, 1L);
 
-		if (!readCfg)
-			Config::Enter();
+	bool readCfg = Config::Read();
 
-		if (!SetCACert(curl) || !Guard::Sync(curl) || !Login::DoLogin(curl) || !Login::GetSessionId(curl))
+	if (!readCfg)
+	{
+		Config::Import();
+		Config::Enter();
+	}
+	
+	if (!SetCACert(curl) || !Guard::Sync(curl) || !Login::DoLogin(curl) || !Login::GetSteamInfo(curl))
+	{
+		curl_easy_cleanup(curl);
+		curl_global_cleanup();
+		Pause();
+		return 2;
+	}
+
+	if (!readCfg)
+		Config::Write();
+
+	Config::ZeroLoginDetails();
+
+#ifdef _WIN32
+	// prevent sleep
+	SetThreadExecutionState(ES_CONTINUOUS | ES_SYSTEM_REQUIRED);
+	
+	HWND hWnd = GetConsoleWindow();
+#endif // _WIN32
+
+	Market::Init();
+
+	while (true)
+	{
+		Market::Ping(curl, Config::marketApiKey);
+
+		for (int market = 0; market < MARKET_COUNT; ++market)
 		{
-			std::cout << "Press any key to exit...";
-			_getch();
-			return 1;
-		}
+			int status = Market::CheckItems(curl, market);
 
-		if (!readCfg)
-		{
-			Login::GetSteamIdApiKey(curl);
-			Config::Write();
-		}
-
-		while (true)
-		{
-			Market::Ping(curl, Config::marketapikey);
-
-			for (int market = 0; market < MARKET_COUNT; ++market)
+			if (status == ITEM_STATUS_GIVE)
 			{
-				int status = Market::CheckItems(curl, market);
+#ifdef _WIN32
+				FlashWindow(hWnd, TRUE);
+#endif // _WIN32
+				rapidjson::Document parsed;
+				if (!Market::RequestGiveDetails(curl, &parsed))
+					continue;
 
-				if (market == MARKET_CSGO && status == ITEM_STATUS_GIVE)
+				const rapidjson::Value& offers = parsed["offers"];
+				rapidjson::SizeType offerCount = offers.Size();
+
+				const auto offerIds = new char[offerCount][OFFER_ID_SIZE];
+
+				for (rapidjson::SizeType i = 0; i < offerCount; ++i)
 				{
-					rapidjson::Document doc;
-					if (!Market::RequestDetails(curl, &doc))
-						continue;
+					const rapidjson::Value& offer = offers[i];
 
-					const rapidjson::Value& offers = doc["offers"];
-					rapidjson::SizeType offercount = offers.Size();
+					rapidjson::StringBuffer buffer;
+					rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
+					offer["items"].Accept(writer);
 
-					char(* const tradeofferids)[OFFERID_LEN] = new char[offercount][OFFERID_LEN];
-
-					for (rapidjson::SizeType i = 0; i < offercount; ++i)
+					// partner returned by market is sometimes a string, sometimes an int
+					const char* pPartner;
+					
+					char partner32[STEAMID32_SIZE];
+					if (offer["partner"].IsInt())
 					{
-						const rapidjson::Value& offer = offers[i];
+						sprintf_s(partner32, sizeof(partner32), "%d", offer["partner"].GetInt());
+						pPartner = partner32;
+					}
+					else
+						pPartner = offer["partner"].GetString();
 
-						rapidjson::StringBuffer buffer;
-						rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
-						offer["items"].Accept(writer);
+					for (unsigned int j = 0; j < 5; ++j)
+					{
+						if (Offer::Send(curl,
+							pPartner,
+							offer["token"].GetString(),
+							offer["tradeoffermessage"].GetString(),
+							buffer.GetString(),
+							offerIds[i]))
+							break;
 
-						// partner returned by market is sometimes a string, sometimes an int
-						char partner[12];
-						if (offer["partner"].IsInt())
-							_itoa_s(offer["partner"].GetInt(), partner, sizeof(partner), 10);
-
-						while (!Offer::Send(curl, offer["partner"].IsInt() ? partner : offer["partner"].GetString(), offer["token"].GetString(),
-							offer["tradeoffermessage"].GetString(), buffer.GetString(), tradeofferids[i]))
-							std::this_thread::sleep_for(5s);
-
-						std::this_thread::sleep_for(5s);
+						std::this_thread::sleep_for(1min);
 					}
 
-					Guard::AcceptConfirmations(curl, tradeofferids, offercount);
+					std::this_thread::sleep_for(5s);
+				}
 
-					delete[] tradeofferids;
-				}
-				else if (status == ITEM_STATUS_GIVE || status == ITEM_STATUS_TAKE)
-				{
-					char offerId[OFFERID_LEN];
-					char partnerId[STEAMID64_LEN];
-					//char secretCode[MARKET_SECRET_LEN];
-					if (Market::RequestOffer(curl, market, (status == ITEM_STATUS_TAKE), offerId, partnerId/*, secretCode*/)
-						/*&& CheckOffer(curl, offerId, secretCode)*/ &&
-						Offer::Accept(curl, offerId, partnerId))
-						Guard::AcceptConfirmation(curl, offerId);
-				}
+				Guard::AcceptConfirmations(curl, offerIds, offerCount);
+
+				delete[] offerIds;
 			}
+			else if (status == ITEM_STATUS_TAKE)
+			{
+#ifdef _WIN32
+				FlashWindow(hWnd, TRUE);
+#endif // _WIN32
+				char offerId[OFFER_ID_SIZE];
+				char partnerId[STEAMID64_SIZE];
 
-			std::this_thread::sleep_for(1min);
+				if (Market::RequestTakeDetails(curl, market, offerId, partnerId))
+					Offer::Accept(curl, offerId, partnerId);
+			}
 		}
-		curl_easy_cleanup(curl);
+
+		std::this_thread::sleep_for(1min);
 	}
+
+	curl_easy_cleanup(curl);
 	curl_global_cleanup();
 	return 0;
 }

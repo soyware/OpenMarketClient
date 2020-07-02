@@ -1,6 +1,7 @@
 #pragma once
 
 #define CAPTCHA_GID_SIZE 20
+#define CAPTCHA_ANSWER_SIZE 8
 
 namespace Captcha
 {
@@ -8,8 +9,8 @@ namespace Captcha
 	{
 		Log("Refreshing captcha...");
 
-		CURLdata data;
-		curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void*)&data);
+		CURLdata response;
+		curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void*)&response);
 		curl_easy_setopt(curl, CURLOPT_URL, "https://steamcommunity.com/login/refreshcaptcha/");
 
 		if (curl_easy_perform(curl) != CURLE_OK)
@@ -18,13 +19,13 @@ namespace Captcha
 			return false;
 		}
 
-		rapidjson::Document doc;
-		doc.Parse(data.data);
+		rapidjson::Document parsed;
+		parsed.Parse(response.data);
 
-		if (doc["gid"].IsInt())
+		if (parsed["gid"].IsInt())
 			strcpy_s(outGid, CAPTCHA_GID_SIZE, "-1");
 		else
-			strcpy_s(outGid, CAPTCHA_GID_SIZE, doc["gid"].GetString());
+			strcpy_s(outGid, CAPTCHA_GID_SIZE, parsed["gid"].GetString());
 
 		std::cout << "ok\n";
 		return true;
@@ -32,14 +33,17 @@ namespace Captcha
 
 	bool Handle(CURL* curl, const char* gid, char* outAnswer)
 	{
+		const size_t urlSz = sizeof("https://steamcommunity.com/login/rendercaptcha/?gid=") - 1 + CAPTCHA_GID_SIZE;
+		char url[urlSz] = "https://steamcommunity.com/login/rendercaptcha/?gid=";
+
+		strcat_s(url, sizeof(url), gid);
+
+#ifdef _WIN32
 		Log("Getting captcha...");
 
-		char url[72] = "https://steamcommunity.com/login/rendercaptcha/?gid=";
-		strcat_s(url, sizeof(url), gid);
 		curl_easy_setopt(curl, CURLOPT_URL, url);
 
-		FILE* file;
-		fopen_s(&file, "captcha.png", "wb");
+		FILE* file = fopen("captcha.png", "wb");
 		if (!file)
 		{
 			std::cout << "file creation failed\n";
@@ -61,7 +65,12 @@ namespace Captcha
 
 		system("start \"\" \"captcha.png\"");
 
-		std::cout << "ok. Enter captcha: ";
+		std::cout << "ok\n";
+#else
+		Log("Captcha link: ", url, '\n');
+#endif // _WIN32
+
+		Log("Enter the answer: ");
 		std::cin >> outAnswer;
 
 		return true;

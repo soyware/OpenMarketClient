@@ -1,137 +1,237 @@
 #pragma once
 
-#include "pkcs7.h"
+#include "PKCS7.h"
 
 namespace Config
 {
-	char username[32];
-	char password[32];
-	char shared[29];
-	char identity[29];
-	char deviceid[45];
-	char steamid64[STEAMID64_LEN];
-	//char steamapikey[33];
-	char marketapikey[32];
-	char successcheck[] = "hello";
+	char username[32] = { 0 };
+	char password[32] = { 0 };
+	char shared[29] = { 0 };
+	char identity[29] = { 0 };
+	char deviceid[45] = { 0 };
+	//char steamapikey[33] = { 0 };
+	char marketApiKey[32] = { 0 };
+	char steamid64[STEAMID64_SIZE] = { 0 };
 
-	char* const fields[] = { username, password, shared, identity,
-		deviceid, steamid64, /*steamapikey,*/ marketapikey, successcheck };
+	char sessionid[25] = { 0 };
 
-	constexpr const size_t fieldssize[] = { sizeof(username), sizeof(password), sizeof(shared), sizeof(identity),
-		sizeof(deviceid), sizeof(steamid64), /*sizeof(steamapikey),*/ sizeof(marketapikey), sizeof(successcheck) };
+	char* const fields[] = 
+	{
+		username,
+		password,
+		shared,
+		identity,
+		deviceid,
+		/*steamapikey,*/
+		marketApiKey,
+		steamid64
+	};
+
+	constexpr size_t fieldSizes[] = 
+	{
+		sizeof(username),
+		sizeof(password),
+		sizeof(shared),
+		sizeof(identity),
+		sizeof(deviceid),
+		/*sizeof(steamapikey),*/
+		sizeof(marketApiKey),
+		sizeof(steamid64)
+	};
+
+	constexpr size_t fieldsSize = []() constexpr
+	{
+		size_t result = 0;
+		for (size_t i = 0; i < std::size(fields); ++i)
+			result += fieldSizes[i];
+		return result;
+	}();
+
+	const size_t fieldsPaddedSize = fieldsSize + _PKCS7_GetPadSize(fieldsSize, AES_BLOCK_SIZE);
+
+	const char filename[] = "config";
+	const char delimiter = '\n';
+
+	const size_t keySize = AES_256_KEY_SIZE;
+	const size_t saltSize = 16;
+	const size_t ivSize = GCM_NONCE_MID_SZ;
+	const size_t authTagSize = AES_BLOCK_SIZE;
+	const int iterationCount = 50000;
 
 	void Enter()
 	{
-		Log("Enter username: ");
-		std::cin >> username;
+		if (!username[0])
+		{
+			Log("Enter username: ");
+			std::cin >> username;
+		}
+		
+		if (!password[0])
+		{
+			Log("Enter password: ");
+			SetStdinEcho(false);
+			std::cin >> password;
+			SetStdinEcho(true);
+			std::cout << '\n';
+		}
 
-		Log("Enter password: ");
-		SetStdinEcho(false);
-		std::cin >> password;
-		SetStdinEcho(true);
-		std::cout << '\n';
+		if (!shared[0])
+		{
+			Log("Enter shared secret: ");
+			std::cin >> shared;
+		}
 
-		Log("Enter base64 encoded shared secret: ");
-		std::cin >> shared;
+		if (!identity[0])
+		{
+			Log("Enter identity secret: ");
+			std::cin >> identity;
+		}
 
-		Log("Enter base64 encoded identity secret: ");
-		std::cin >> identity;
+		if (!deviceid[0])
+		{
+			Log("Enter device id: ");
+			std::cin >> deviceid;
+		}
 
-		Log("Enter device id: ");
-		std::cin >> deviceid;
+		if (!marketApiKey[0])
+		{
+			Log("Enter market api-key: ");
+			std::cin >> marketApiKey;
+		}
+	}
 
-		Log("Enter market api-key: ");
-		std::cin >> marketapikey;
+	void ZeroLoginDetails()
+	{
+		for (unsigned int i = 0; i < 3; ++i)
+			memset(fields[i], 0, fieldSizes[i]);
 	}
 
 	bool Write()
 	{
 		Log("Enter config encryption password: ");
-		char encryptpass[32];
+		char encryptKey[keySize];
 		SetStdinEcho(false);
-		std::cin >> encryptpass;
+		std::cin >> encryptKey;
 		SetStdinEcho(true);
 		std::cout << '\n';
 
-		constexpr const size_t fieldstotalsize = []() constexpr
-		{
-			size_t result = 0;
-			for (size_t i = 0; i < _countof(fields); ++i)
-				result += fieldssize[i];
-			return result;
-		}();
+		byte summary[fieldsPaddedSize];
+		byte* start = summary;
 
-		char summary[fieldstotalsize] = { 0 };
-		for (size_t i = 0; i < _countof(fields); ++i)
+		for (size_t i = 0; i < std::size(fields); ++i)
 		{
-			strcat_s(summary, sizeof(summary), fields[i]);
-			strcat_s(summary, sizeof(summary), "\n");
+			// append field and delimiter, strcat method is 4 lines too but slower
+			size_t len = strlen(fields[i]);
+			memcpy(start, fields[i], len);
+			start[len] = delimiter;
+			start += len + 1;
 		}
 
 		Log("Encrypting config...");
 
-		byte salt[16];
-		byte iv[16];
+		byte salt[saltSize];
+		byte iv[ivSize];
 
 		WC_RNG rng;
-		if (wc_InitRng(&rng) || wc_RNG_GenerateBlock(&rng, salt, sizeof(salt)) || wc_RNG_GenerateBlock(&rng, iv, sizeof(iv)) || wc_FreeRng(&rng))
+		if (wc_InitRng(&rng))
 		{
-			std::cout << "random generation failed\n";
+			std::cout << "rng init failed\n";
 			return false;
 		}
 
-		size_t summarylen = strlen(summary);
+		bool rngFailed = (wc_RNG_GenerateBlock(&rng, salt, sizeof(salt)) || wc_RNG_GenerateBlock(&rng, iv, sizeof(iv)));
+		wc_FreeRng(&rng);
 
-		int resultlen = summarylen + wc_PKCS7_GetPadSize(summarylen, AES_BLOCK_SIZE);
-		byte* result = new byte[resultlen];
-		wc_PKCS7_PadData((byte*)summary, summarylen, result, resultlen, AES_BLOCK_SIZE);
-
-		if (0 > wc_CryptKey(encryptpass, strlen(encryptpass), salt, sizeof(salt), 100000,
-			PBESTypes::PBE_AES256_CBC, result, resultlen, PKCSTypes::PKCS5v2, iv, 1))
+		if (rngFailed)
 		{
-			std::cout << "encryption failed\n";
+			std::cout << "rng failed\n";
 			return false;
 		}
 
-		byte salt64[int(sizeof(salt) * 1.5f)];
-		size_t salt64len = sizeof(salt64);
+		const size_t summaryLen = (start - summary);
+		const size_t summaryPaddedLen = _PKCS7_PadData(summary, summaryLen, sizeof(summary), AES_BLOCK_SIZE);
 
-		byte iv64[int(sizeof(iv) * 1.5f)];
-		size_t iv64len = sizeof(iv64);
+		byte keyStretched[keySize];
+		Aes aes;
+		byte* encrypted = new byte[summaryPaddedLen];
+		byte authTag[authTagSize];
 
-		size_t result64len = resultlen * 1.5f;
-		byte* result64 = new byte[result64len];
-
-		if (Base64_Encode_NoNl(salt, sizeof(salt), salt64, &salt64len) ||
-			Base64_Encode_NoNl(iv, sizeof(iv), iv64, &iv64len) ||
-			Base64_Encode_NoNl(result, resultlen, result64, &result64len))
+		if (wc_PBKDF2(keyStretched, (const byte*)encryptKey, strlen(encryptKey), salt, sizeof(salt), iterationCount, keySize, WC_SHA256) ||
+			wc_AesGcmSetKey(&aes, keyStretched, keySize) ||
+			wc_AesGcmEncrypt(&aes, encrypted, summary, summaryPaddedLen, iv, sizeof(iv), authTag, sizeof(authTag), nullptr, 0))
 		{
-			std::cout << "base64 encoding failed\n";
+			delete[] encrypted;
+			std::cout << "fail\n";
 			return false;
 		}
-
-		delete[] result;
 
 		std::cout << "ok\n";
+
+		memset(encryptKey, 0, sizeof(encryptKey));
+		memset(keyStretched, 0, sizeof(keyStretched));
+		memset(summary, 0, sizeof(summary));
+
 		Log("Writing config...");
 
-		FILE* file;
-		fopen_s(&file, "config", "wb");
+		FILE* file = fopen(filename, "wb");
 		if (!file)
 		{
-			std::cout << "file creation failed\n";
+			delete[] encrypted;
+			std::cout << "fail\n";
 			return false;
 		}
 
-		fwrite(salt64, sizeof(byte), salt64len, file);
-		fputc('$', file);
-		fwrite(iv64, sizeof(byte), iv64len, file);
-		fputc('$', file);
-		fwrite(result64, sizeof(byte), result64len, file);
+		fwrite(salt, sizeof(byte), saltSize, file);
+		fwrite(iv, sizeof(byte), ivSize, file);
+		fwrite(authTag, sizeof(byte), authTagSize, file);
+		fwrite(encrypted, sizeof(byte), summaryPaddedLen, file);
 
 		fclose(file);
 
-		delete[] result64;
+		delete[] encrypted;
+
+		std::cout << "ok\n";
+		return true;
+	}
+
+	bool Decrypt(const byte* in, size_t inSz, byte* out)
+	{
+		const byte* salt = in;
+		const byte* iv = salt + saltSize;
+		const byte* authTag = iv + ivSize;
+		const byte* encSummary = authTag + authTagSize;
+		const size_t encSummarySize = inSz - (encSummary - in);
+
+		SetStdinEcho(false);
+		while (true)
+		{
+			Log("Enter config decryption password: ");
+			char decryptKey[keySize];
+			std::cin >> decryptKey;
+			std::cout << '\n';
+
+			Log("Decrypting config...");
+
+			Aes aes;
+
+			byte keyStretched[keySize];
+			if (wc_PBKDF2(keyStretched, (const byte*)decryptKey, strlen(decryptKey), salt, saltSize, iterationCount, keySize, WC_SHA256) ||
+				wc_AesGcmSetKey(&aes, keyStretched, keySize))
+			{
+				std::cout << "fail\n";
+				return false;
+			}
+
+			if (!wc_AesGcmDecrypt(&aes, out, encSummary, encSummarySize, iv, ivSize, authTag, authTagSize, nullptr, 0))
+			{
+				memset(decryptKey, 0, sizeof(decryptKey));
+				memset(keyStretched, 0, sizeof(keyStretched));
+				break;
+			}
+			else
+				std::cout << "wrong password\n";
+		}
+		SetStdinEcho(true);
 
 		std::cout << "ok\n";
 		return true;
@@ -141,104 +241,138 @@ namespace Config
 	{
 		Log("Reading config...");
 
-		FILE* file;
-		fopen_s(&file, "config", "rb");
+		FILE* file = fopen(filename, "rb");
 		if (!file)
 		{
 			std::cout << "not found or opening failed\n";
 			return false;
 		}
+		
+		long fsize;
 
-		fseek(file, 0, SEEK_END);
-		size_t fsize = ftell(file);
-		rewind(file);
-
-		byte* content = new byte[fsize];
-		if (fsize != fread_s(content, fsize, sizeof(byte), fsize, file))
+		if (fseek(file, 0, SEEK_END) ||
+			((fsize = ftell(file)) == -1L) ||
+			fseek(file, 0, SEEK_SET))
 		{
-			std::cout << "file reading failed\n";
+			fclose(file);
+			std::cout << "failed to get file size\n";
 			return false;
 		}
+
+		byte* contents = new byte[fsize];
+		bool readFailed = (fread(contents, sizeof(byte), fsize, file) != fsize);
 		fclose(file);
 
-		std::cout << "ok\n";
-		Log("Decoding config...");
-
-		const byte* saltend = (const byte*)memchr(content, '$', fsize);
-		const byte* ivend = (const byte*)memchr(saltend + 1, '$', fsize);
-
-		byte salt64[int(16 * 1.5f)];
-		memcpy_s(salt64, sizeof(salt64), content, saltend - content);
-
-		byte iv64[int(16 * 1.5f)];
-		memcpy_s(iv64, sizeof(iv64), saltend + 1, ivend - (saltend + 1));
-
-		size_t result64len = fsize - ((ivend + 1) - content);
-		byte* result64 = new byte[result64len];
-		memcpy_s(result64, result64len, ivend + 1, result64len);
-
-		delete[] content;
-
-		byte salt[int(sizeof(salt64) / 1.3f)];
-		size_t saltlen = sizeof(salt);
-
-		byte iv[int(sizeof(iv64) / 1.3f)];
-		size_t ivlen = sizeof(iv);
-
-		size_t resultlen = result64len / 1.3f;
-		byte* result = new byte[resultlen];
-
-		if (Base64_Decode(salt64, sizeof(salt64), salt, &saltlen) ||
-			Base64_Decode(iv64, sizeof(iv64), iv, &ivlen) ||
-			Base64_Decode(result64, result64len, result, &resultlen))
+		if (readFailed)
 		{
-			std::cout << "base64 decoding failed\n";
+			delete[] contents;
+			std::cout << "fail\n";
 			return false;
 		}
 
-		delete[] result64;
 		std::cout << "ok\n";
 
-		char* summary = new char[resultlen + 1] { 0 };
+		byte summary[fieldsPaddedSize];
+		bool decryptFailed = (!Decrypt(contents, fsize, summary));
+		delete[] contents;
 
-		SetStdinEcho(false);
-		while (true)
+		if (decryptFailed)
+			return false;
+
+		const byte* start = summary;
+
+		for (size_t i = 0; i < std::size(fields); ++i)
 		{
-			Log("Enter config decryption password: ");
-			char decryptpass[32];
-			std::cin >> decryptpass;
-			std::cout << '\n';
+			const byte* end = (byte*)memchr(start, (int)delimiter, fieldSizes[i]);
+			memcpy(fields[i], start, (end - start));
+			fields[i][fieldSizes[i] - 1] = '\0';
+			start = end + 1;
+		}
 
-			Log("Decrypting config...");
+		memset(summary, 0, sizeof(summary));
+		
+		return true;
+	}
 
-			memcpy_s(summary, resultlen, result, resultlen);
+	bool Import()
+	{
+		Log("Looking for a SDA maFile...");
 
-			if (0 > wc_CryptKey(decryptpass, strlen(decryptpass), salt, 16, 100000,
-				PBESTypes::PBE_AES256_CBC, (byte*)summary, resultlen, PKCSTypes::PKCS5v2, iv, 0))
+		std::filesystem::path path;
+		std::filesystem::path currentDir(std::filesystem::current_path());
+
+		for (const auto& entry : std::filesystem::directory_iterator(currentDir))
+       	{	
+			if (!entry.path().extension().compare(".maFile"))
 			{
-				std::cout << "decryption failed\n";
-				return false;
-			}
-
-			char* lastnewline = strrchr(summary, '\n');
-			if (!lastnewline || memcmp(lastnewline - (sizeof(Config::successcheck) - 1), Config::successcheck, sizeof(Config::successcheck) - 1))
-				std::cout << "wrong password\n";
-			else
+				path = entry.path();
 				break;
+			}
 		}
-		SetStdinEcho(true);
 
-		delete[] result;
-
-		char* fieldstart[_countof(fields)] = { summary };
-
-		for (size_t i = 0; i < (_countof(fields) - 1); ++i)
+		if (path.empty())
 		{
-			fieldstart[i + 1] = strchr(fieldstart[i] + 1, '\n') + 1;
-			strncpy_s(fields[i], fieldssize[i], fieldstart[i], (fieldstart[i + 1] - fieldstart[i] - 1));
+			std::cout << "not found\n";
+			return false;
 		}
 
-		delete[] summary;
+		std::cout << "found\n";
+		Log("Importing maFile...");
+
+#ifdef _WIN32
+		FILE* file = _wfopen(path.c_str(), L"rb");
+#else
+		FILE* file = fopen(path.c_str(), "rb");
+#endif // _WIN32
+		if (!file)
+		{
+			std::cout << "opening failed\n";
+			return false;
+		}
+		
+		long fsize;
+
+		if (fseek(file, 0, SEEK_END) ||
+			((fsize = ftell(file)) == -1L) ||
+			fseek(file, 0, SEEK_SET))
+		{
+			fclose(file);
+			std::cout << "failed to get file size\n";
+			return false;
+		}
+
+		byte* contents = new byte[fsize + 1] { 0 };
+		bool readFailed = (fread(contents, sizeof(byte), fsize, file) != fsize);
+		fclose(file);
+
+		if (readFailed)
+		{
+			delete[] contents;
+			std::cout << "reading failed\n";
+			return false;
+		}
+
+		if (contents[0] != '{')
+		{
+			delete[] contents;
+			std::cout << "disable encryption in SDA before importing\n";
+			return false;
+		}
+
+		rapidjson::Document doc;
+		doc.Parse((const char*)contents);
+
+		delete[] contents;
+
+		strcpy_s(username, sizeof(username), doc["account_name"].GetString());
+		strcpy_s(shared, sizeof(shared), doc["shared_secret"].GetString());
+		strcpy_s(identity, sizeof(identity), doc["identity_secret"].GetString());
+		strcpy_s(deviceid, sizeof(deviceid), doc["device_id"].GetString());
+		sprintf_s(steamid64, sizeof(steamid64), "%llu", doc["Session"]["SteamID"].GetUint64());
+
+#ifndef _DEBUG
+		std::filesystem::remove(path);
+#endif // !_DEBUG
 
 		std::cout << "ok\n";
 		return true;

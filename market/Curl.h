@@ -56,7 +56,7 @@ bool DownloadCACert(CURL* curl, FILE* file)
 
 	if (res != CURLE_OK)
 	{
-		std::cout << "request failed\n";
+		std::cout << "fail\n";
 		return false;
 	}
 
@@ -66,8 +66,7 @@ bool DownloadCACert(CURL* curl, FILE* file)
 
 bool SetCACert(CURL* curl)
 {
-	FILE* file;
-	fopen_s(&file, "cacert.pem", "wbx");
+	FILE* file = fopen("cacert.pem", "wbx");
 	if (!file || DownloadCACert(curl, file))
 	{
 		curl_easy_setopt(curl, CURLOPT_CAINFO, "cacert.pem");
