@@ -58,8 +58,8 @@ namespace Login
 
 		byte modulus[MODULUS_LEN];
 		byte exponent[EXPONENT_LEN];
-		size_t modSz = sizeof(modulus);
-		size_t expSz = sizeof(exponent);
+		word32 modSz = sizeof(modulus);
+		word32 expSz = sizeof(exponent);
 
 		if (Base16_Decode(hexModulus, MODULUS_LEN * 2, modulus, &modSz) ||
 			Base16_Decode(hexExponent, EXPONENT_LEN * 2, exponent, &expSz))

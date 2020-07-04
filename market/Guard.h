@@ -238,7 +238,7 @@ namespace Guard
 
 		strcat_s(postFields, postFieldsSz, "&op=allow");
 
-		int confCount = 0;
+		size_t confCount = 0;
 
 		for (size_t i = 0; i < offerCount; ++i)
 		{
@@ -281,7 +281,7 @@ namespace Guard
 		}
 
 		if (confCount != offerCount)
-			std::cout << "confirmed " << confCount << " out of " << offerCount << "offers\n";
+			std::cout << "accepted " << confCount << " out of " << offerCount << '\n';
 		else
 			std::cout << "ok\n";
 

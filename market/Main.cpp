@@ -8,7 +8,6 @@
 #include "Market.h"
 
 // TODO:
-// linux
 // dont save password, save cookies? + check if marketapikey is valid 
 // release steam guard file at separate repo?
 
