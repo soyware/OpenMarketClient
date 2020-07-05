@@ -82,6 +82,8 @@ int main()
 
 				const auto offerIds = new char[offerCount][OFFER_ID_SIZE];
 
+				rapidjson::SizeType sentCount = 0;
+
 				for (rapidjson::SizeType i = 0; i < offerCount; ++i)
 				{
 					const rapidjson::Value& offer = offers[i];
@@ -102,23 +104,21 @@ int main()
 					else
 						pPartner = offer["partner"].GetString();
 
-					for (unsigned int j = 0; j < 5; ++j)
+					if (Offer::Send(curl,
+						pPartner,
+						offer["token"].GetString(),
+						offer["tradeoffermessage"].GetString(),
+						buffer.GetString(),
+						offerIds[sentCount]))
 					{
-						if (Offer::Send(curl,
-							pPartner,
-							offer["token"].GetString(),
-							offer["tradeoffermessage"].GetString(),
-							buffer.GetString(),
-							offerIds[i]))
-							break;
-
-						std::this_thread::sleep_for(1min);
+						++sentCount;
 					}
 
-					std::this_thread::sleep_for(5s);
+					std::this_thread::sleep_for(10s);
 				}
-
-				Guard::AcceptConfirmations(curl, offerIds, offerCount);
+				
+				if (0 < sentCount)
+					Guard::AcceptConfirmations(curl, offerIds, sentCount);
 
 				delete[] offerIds;
 			}
