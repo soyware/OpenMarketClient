@@ -1,12 +1,14 @@
 # MarketsBot
-Lightweight console bot for markets.csgo.tm / markets.dota2.net
+Cross-platform console bot for markets.csgo.tm / markets.dota2.net
+
+![screenshot](screenshot.png)
 
 # Features
 * Keeps your market profile online
 * Sends sold items
 * Recieves bought items
 * Accepts Steam Guard confirmations
-* Low memory footprint (around 1300KB)
+* Ability to import SDA's maFile (simply put it a folder)
 
 # Usage
 To work, this bot needs the following:
@@ -14,17 +16,14 @@ To work, this bot needs the following:
 * Steam password
 * Market API-key ([you can get one here](https://market.csgo.com/docs-v2))
 
-*and those items from Steam Guard app*
-* Base64 encoded shared secret
-* Base64 encoded identity secret
+*and those Steam Guard items*
+* Shared secret
+* Identity secret
 * Device ID
 
 All of those are encrypted and put into config after you enter them.
 
-Simply compile / download latest release, start the program and follow instructions.
+Simply compile / download latest release (rarely updated), start the program and follow instructions.
 
 # Compile
-To compile you'll need libcurl, wolfssl and rapidjson
-
-# Suggestions
-If you want to see something added simply open an issue
+You'll need a compiler with c++17 support, libcurl, wolfssl and rapidjson
