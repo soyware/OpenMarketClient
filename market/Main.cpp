@@ -117,7 +117,7 @@ int main()
 					std::this_thread::sleep_for(10s);
 				}
 				
-				if (0 < sentCount)
+				if (sentCount)
 					Guard::AcceptConfirmations(curl, offerIds, sentCount);
 
 				delete[] offerIds;
