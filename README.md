@@ -1,5 +1,5 @@
 # MarketsBot
-Cross-platform console bot for market.csgo.tm / market.dota2.net
+Cross-platform console bot for market.csgo.com / market.dota2.net
 
 ![screenshot](screenshot.png)
 
