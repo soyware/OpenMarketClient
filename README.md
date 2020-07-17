@@ -6,7 +6,7 @@ Cross-platform console bot for markets.csgo.tm / markets.dota2.net
 # Features
 * Keeps your market profile online
 * Sends sold items
-* Recieves bought items
+* Receives bought items
 * Accepts Steam Guard confirmations
 * Ability to import SDA's maFile (simply put it a folder)
 
