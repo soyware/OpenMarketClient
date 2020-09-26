@@ -250,7 +250,7 @@ namespace Login
 		}
 		strcpy_s(Config::sessionid, sizeof(Config::sessionid), strrchr(sessionId->data, '\t') + 1);
 
-		if (!Config::sessionid[0])
+		if (!Config::steamid64[0])
 		{
 			curl_slist* steamId = cookies;
 			while (steamId && !strstr(steamId->data, "\tsteamLoginSecure\t"))
