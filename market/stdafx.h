@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #ifdef _WIN32
 
@@ -14,11 +14,11 @@
 
 #else
 
-#define strcpy_s(a,b,c) strcpy(a,c)
-#define strcat_s(a,b,c) strcat(a,c)
-#define strncat_s(a,b,c,d) strncat(a,c,d)
-#define strncpy_s(a,b,c,d) strncpy(a,c,d)
-#define sprintf_s(a,b,...) sprintf(a,__VA_ARGS__)
+#define strcpy_s(a, b, c) strcpy(a, c)
+#define strcat_s(a, b, c) strcat(a, c)
+#define strncat_s(a, b, c, d) strncat(a, c, d)
+#define strncpy_s(a, b, c, d) strncpy(a, c, d)
+#define sprintf_s(a, b, ...) sprintf(a, __VA_ARGS__)
 
 #include <termios.h>
 #include <unistd.h>

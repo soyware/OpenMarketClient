@@ -1,4 +1,4 @@
-﻿#include "stdafx.h"
+#include "stdafx.h"
 #include "Helpers.h"
 #include "Config.h"
 #include "Curl.h"
@@ -14,6 +14,10 @@
 int main()
 {
 	setlocale(LC_ALL, "");
+#ifdef _WIN32
+	SetConsoleOutputCP(CP_UTF8);
+#endif // _WIN32
+
 	Log("MarketsBot v0.2\n");
 
 	CURL* curl = nullptr;

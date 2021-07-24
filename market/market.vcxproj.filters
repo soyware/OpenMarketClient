@@ -50,7 +50,7 @@
     <ClInclude Include="Guard.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="pkcs7.h">
+    <ClInclude Include="PKCS7.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

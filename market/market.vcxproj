@@ -193,7 +193,7 @@
     <ClInclude Include="Login.h" />
     <ClInclude Include="Market.h" />
     <ClInclude Include="Offer.h" />
-    <ClInclude Include="pkcs7.h" />
+    <ClInclude Include="PKCS7.h" />
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="Helpers.h" />
   </ItemGroup>
