@@ -1,18 +1,18 @@
 #pragma once
 
-// https://en.cppreference.com/w/cpp/language/fold
-template <typename... Args>
-void Log(Args&&... args)
+void Log(const char* format, ...)
 {
 	time_t t;
 	time(&t);
-	tm* lt = localtime(&t);
 	char timedate[24];
-	strftime(timedate, sizeof(timedate), "%X %x", lt);
+	strftime(timedate, sizeof(timedate), "%X %x", localtime(&t));
 
 	std::cout << timedate << ' ';
 
-	(std::cout << ... << args);
+	va_list args;
+	va_start(args, format);
+	vprintf(format, args);
+	va_end(args);
 }
 
 void SetStdinEcho(bool enable)
@@ -42,13 +42,37 @@ void SetStdinEcho(bool enable)
 #endif // _WIN32
 }
 
+// get executable dir
+const char* GetExecDir()
+{
+	static char dir[PATH_MAX] = { 0 };
+
+	if (!dir[0])
+	{
+#ifdef _WIN32
+		if (!GetModuleFileNameA(NULL, dir, _countof(dir)))
+			return nullptr;
+
+		char* del = strrchr(dir, '\\');
+#else
+		if (readlink("/proc/self/exe", dir, sizeof(dir)) == -1)
+			return nullptr;
+
+		char* del = strrchr(dir, '/');
+#endif // _WIN32
+
+		if (del)
+			*(del + 1) = '\0';
+	}
+
+	return dir;
+}
+
 void Pause()
 {
 #ifdef _WIN32
-#pragma warning(push)
-#pragma warning(disable : 4996)
-
 	// stdout isn't a console
+#pragma warning ( suppress: 4996 )
 	if (!isatty(fileno(stdout)))
 		return;
 
@@ -58,8 +82,6 @@ void Pause()
 
 	std::cout << "Press any key to exit...";
 	std::cin.ignore(2);
-
-#pragma warning(pop)
 #endif // _WIN32
 }
 

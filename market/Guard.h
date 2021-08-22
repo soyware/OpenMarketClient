@@ -30,7 +30,7 @@ namespace Guard
 		curl_easy_setopt(curl, CURLOPT_POSTFIELDS, "steamid=0");
 
 		CURLdata response;
-		curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void*)&response);
+		curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
 		curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, &curl_write_function);
 
 		if (curl_easy_perform(curl) != CURLE_OK)
@@ -172,7 +172,7 @@ namespace Guard
 			return false;
 		}
 
-		curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void*)out);
+		curl_easy_setopt(curl, CURLOPT_WRITEDATA, out);
 		curl_easy_setopt(curl, CURLOPT_URL, "https://steamcommunity.com/mobileconf/conf");
 		curl_easy_setopt(curl, CURLOPT_POST, 1L);
 		curl_easy_setopt(curl, CURLOPT_POSTFIELDS, postFields);
@@ -256,7 +256,7 @@ namespace Guard
 		}
 
 		CURLdata response;
-		curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void*)&response);
+		curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
 		curl_easy_setopt(curl, CURLOPT_URL, "https://steamcommunity.com/mobileconf/multiajaxop");
 		curl_easy_setopt(curl, CURLOPT_POST, 1L);
 		curl_easy_setopt(curl, CURLOPT_POSTFIELDS, postFields);

@@ -69,7 +69,7 @@ namespace Market
 		curl_easy_setopt(curl, CURLOPT_NOBODY, 0L);
 
 		CURLdata response;
-		curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void*)&response);
+		curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
 
 		if (curl_easy_perform(curl) != CURLE_OK)
 			return 0;
@@ -97,7 +97,7 @@ namespace Market
 				if (ret == ITEM_STATUS_SELLING)
 				{
 					ret = status;
-					Log(marketNames[market], ": ", ((status == ITEM_STATUS_GIVE) ? "Sold" : "Bought"), " \"", name, '\"');
+					Log("%s: %s \"%s\"", marketNames[market], ((status == ITEM_STATUS_GIVE) ? "Sold" : "Bought"), name);
 				}
 				else
 					std::cout << ", \"" << name << '\"';
@@ -109,7 +109,7 @@ namespace Market
 			if (prevItemCount[market] != itemsCount)
 			{
 				prevItemCount[market] = itemsCount;
-				Log(marketNames[market], ": ", itemsCount, " listing(s)\n");
+				Log("%s: %u listing(s)\n", marketNames[market], itemsCount);
 			}
 		}
 		else
@@ -140,7 +140,7 @@ namespace Market
 		curl_easy_setopt(curl, CURLOPT_URL, url);
 
 		CURLdata response;
-		curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void*)&response);
+		curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
 
 		if (curl_easy_perform(curl) != CURLE_OK)
 		{
@@ -176,7 +176,7 @@ namespace Market
 		curl_easy_setopt(curl, CURLOPT_URL, url);
 
 		CURLdata response;
-		curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void*)&response);
+		curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
 
 		if (curl_easy_perform(curl) != CURLE_OK)
 		{

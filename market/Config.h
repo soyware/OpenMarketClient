@@ -173,7 +173,18 @@ namespace Config
 
 		Log("Writing config...");
 
-		FILE* file = fopen(filename, "wb");
+		const char* dir = GetExecDir();
+		if (!dir)
+		{
+			std::cout << "failed to get executable's directory\n";
+			return false;
+		}
+
+		char path[PATH_MAX];
+		strcpy_s(path, sizeof(path), dir);
+		strcat_s(path, sizeof(path), filename);
+
+		FILE* file = fopen(path, "wb");
 		if (!file)
 		{
 			delete[] encrypted;
@@ -241,7 +252,18 @@ namespace Config
 	{
 		Log("Reading config...");
 
-		FILE* file = fopen(filename, "rb");
+		const char* dir = GetExecDir();
+		if (!dir)
+		{
+			std::cout << "failed to get executable's directory\n";
+			return false;
+		}
+
+		char path[PATH_MAX];
+		strcpy_s(path, sizeof(path), dir);
+		strcat_s(path, sizeof(path), filename);
+
+		FILE* file = fopen(path, "rb");
 		if (!file)
 		{
 			std::cout << "not found or opening failed\n";

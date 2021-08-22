@@ -28,7 +28,7 @@ size_t curl_write_function(void* contents, size_t size, size_t nmemb, void* user
 	char* newMem = (char*)realloc(dataStruct->data, dataStruct->size + realSize + 1);
 	if (!newMem)
 	{
-		std::cerr << "realloc returned NULL\n";
+		std::cout << "realloc failed\n";
 		return 0;
 	}
 
@@ -45,14 +45,14 @@ bool DownloadCACert(CURL* curl, FILE* file)
 	Log("Downloading CA certificate...");
 
 	curl_easy_setopt(curl, CURLOPT_URL, "https://curl.haxx.se/ca/cacert.pem");
-	curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void*)file);
+	curl_easy_setopt(curl, CURLOPT_WRITEDATA, file);
 	curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
 	curl_easy_setopt(curl, CURLOPT_HTTPGET, 1L);
 
 	CURLcode res = curl_easy_perform(curl);
-	fclose(file);
 
 	curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 1L);
+	curl_easy_setopt(curl, CURLOPT_WRITEDATA, stdout);
 
 	if (res != CURLE_OK)
 	{
@@ -66,12 +66,21 @@ bool DownloadCACert(CURL* curl, FILE* file)
 
 bool SetCACert(CURL* curl)
 {
-	FILE* file = fopen("cacert.pem", "wbx");
-	if (!file || DownloadCACert(curl, file))
+	const char* dir = GetExecDir();
+	if (!dir)
+		return false;
+
+	char path[PATH_MAX];
+	strcpy_s(path, sizeof(path), dir);
+	strcat_s(path, sizeof(path), "cacert.pem");
+
+	FILE* file;
+	if ((file = fopen(path, "rb")) ||
+		((file = fopen(path, "wb")) && DownloadCACert(curl, file)))
 	{
-		curl_easy_setopt(curl, CURLOPT_CAINFO, "cacert.pem");
+		fclose(file);
+		curl_easy_setopt(curl, CURLOPT_CAINFO, path);
 		return true;
 	}
-
 	return false;
 }

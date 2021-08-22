@@ -19,7 +19,7 @@ namespace Login
 		strcat_s(postField, postFieldSz, escUsername);
 
 		CURLdata response;
-		curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void*)&response);
+		curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
 		curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, &curl_write_function);
 		curl_easy_setopt(curl, CURLOPT_POST, 1L);
 		curl_easy_setopt(curl, CURLOPT_POSTFIELDS, postField);
@@ -188,7 +188,7 @@ namespace Login
 		curl_free(escCaptchaText);
 
 		CURLdata response;
-		curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void*)&response);
+		curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
 		curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, &curl_write_function);
 		curl_easy_setopt(curl, CURLOPT_POST, 1L);
 		curl_easy_setopt(curl, CURLOPT_POSTFIELDS, postFields.c_str());
@@ -278,7 +278,7 @@ namespace Login
 		Log("Getting steam api key...");
 
 		CURLdata apipage;
-		curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void*)&apipage);
+		curl_easy_setopt(curl, CURLOPT_WRITEDATA, apipage);
 		curl_easy_setopt(curl, CURLOPT_URL, "https://steamcommunity.com/dev/apikey");
 		curl_easy_setopt(curl, CURLOPT_HTTPGET, 1L);
 
@@ -300,7 +300,7 @@ namespace Login
 			strcat_s(postFields, sizeof(postFields), g_sessionID);
 
 			CURLdata registerpage;
-			curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void*)&registerpage);
+			curl_easy_setopt(curl, CURLOPT_WRITEDATA, registerpage);
 			curl_easy_setopt(curl, CURLOPT_URL, "https://steamcommunity.com/dev/registerkey");
 			curl_easy_setopt(curl, CURLOPT_POST, 1L);
 			curl_easy_setopt(curl, CURLOPT_POSTFIELDS, postFields);

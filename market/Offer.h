@@ -38,7 +38,7 @@ namespace Offer
 		strcat_s(postFields, sizeof(postFields), Config::sessionid);
 
 		CURLdata response;
-		curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void*)&response);
+		curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
 		curl_easy_setopt(curl, CURLOPT_POST, 1L);
 		curl_easy_setopt(curl, CURLOPT_POSTFIELDS, postFields);
 
@@ -97,7 +97,7 @@ namespace Offer
 			Config::sessionid);
 
 		CURLdata response;
-		curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void*)&response);
+		curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
 		curl_easy_setopt(curl, CURLOPT_POST, 1L);
 		curl_easy_setopt(curl, CURLOPT_POSTFIELDS, postFields);
 		curl_easy_setopt(curl, CURLOPT_URL, "https://steamcommunity.com/tradeoffer/new/send");

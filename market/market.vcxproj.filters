@@ -32,7 +32,7 @@
     <ClInclude Include="Captcha.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Helpers.h">
+    <ClInclude Include="Misc.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Market.h">

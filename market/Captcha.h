@@ -10,7 +10,7 @@ namespace Captcha
 		Log("Refreshing captcha...");
 
 		CURLdata response;
-		curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void*)&response);
+		curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
 		curl_easy_setopt(curl, CURLOPT_URL, "https://steamcommunity.com/login/refreshcaptcha/");
 
 		if (curl_easy_perform(curl) != CURLE_OK)
@@ -43,14 +43,25 @@ namespace Captcha
 
 		curl_easy_setopt(curl, CURLOPT_URL, url);
 
-		FILE* file = fopen("captcha.png", "wb");
+		const char* dir = GetExecDir();
+		if (!dir)
+		{
+			std::cout << "failed to get executable's directory\n";
+			return false;
+		}
+
+		char path[PATH_MAX];
+		strcpy_s(path, sizeof(path), dir);
+		strcat_s(path, sizeof(path), "captcha.png");
+
+		FILE* file = fopen(path, "wb");
 		if (!file)
 		{
 			std::cout << "file creation failed\n";
 			return false;
 		}
 
-		curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void*)file);
+		curl_easy_setopt(curl, CURLOPT_WRITEDATA, file);
 		curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, NULL);
 		curl_easy_setopt(curl, CURLOPT_HTTPGET, 1L);
 
@@ -67,7 +78,7 @@ namespace Captcha
 
 		std::cout << "ok\n";
 #else
-		Log("Captcha link: ", url, '\n');
+		Log("Captcha link: %s\n", url);
 #endif // _WIN32
 
 		Log("Enter the answer: ");

@@ -1,5 +1,5 @@
 #include "stdafx.h"
-#include "Helpers.h"
+#include "Misc.h"
 #include "Config.h"
 #include "Curl.h"
 #include "Guard.h"
@@ -13,12 +13,13 @@
 
 int main()
 {
-	setlocale(LC_ALL, "");
+	// LC_ALL breaks SetConsoleOutputCP
+	setlocale(LC_TIME, "");
 #ifdef _WIN32
 	SetConsoleOutputCP(CP_UTF8);
 #endif // _WIN32
 
-	Log("MarketsBot v0.2\n");
+	Log("MarketsBot v0.2.1\n");
 
 	CURL* curl = nullptr;
 	if (curl_global_init(CURL_GLOBAL_ALL) || !(curl = curl_easy_init()))
@@ -33,6 +34,7 @@ int main()
 	curl_easy_setopt(curl, CURLOPT_TIMEOUT, 20L);
 	curl_easy_setopt(curl, CURLOPT_IPRESOLVE, CURL_IPRESOLVE_V4);
 	curl_easy_setopt(curl, CURLOPT_FAILONERROR, 1L);
+	curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
 
 	bool readCfg = Config::Read();
 
@@ -42,7 +44,12 @@ int main()
 		Config::Enter();
 	}
 	
-	if (!SetCACert(curl) || !Guard::Sync(curl) || !Login::DoLogin(curl) || !Login::GetSteamInfo(curl))
+	if (
+		// let libcurl use system's default ca-bundle on linux
+#ifdef _WIN32
+		!SetCACert(curl) ||
+#endif // _WIN32
+		!Guard::Sync(curl) || !Login::DoLogin(curl) || !Login::GetSteamInfo(curl))
 	{
 		curl_easy_cleanup(curl);
 		curl_global_cleanup();
