@@ -152,7 +152,6 @@ namespace Config
 			authTag, authTagSize,
 			encrypted))
 		{
-			printf("encryption failed\n");
 			return false;
 		}
 
@@ -234,9 +233,6 @@ namespace Config
 				memset(decryptPass, 0, sizeof(decryptPass));
 				break;
 			}
-			else
-				Log("Incorrect password\n");
-
 		} while (true);
 
 		SetStdinEcho(true);

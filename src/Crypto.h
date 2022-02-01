@@ -41,16 +41,12 @@ namespace Crypto
 		byte* outAuthTag, word32 outAuthTagSize,
 		byte* output)
 	{
-#ifdef _DEBUG
 		Log("Encrypting...");
-#endif // _DEBUG
 
 		WC_RNG rng;
 		if (wc_InitRng(&rng))
 		{
-#ifdef _DEBUG
 			printf("rng init failed\n");
-#endif // _DEBUG
 			return false;
 		}
 
@@ -59,9 +55,7 @@ namespace Crypto
 
 		if (rngFailed)
 		{
-#ifdef _DEBUG
 			printf("rng generation failed\n");
-#endif // _DEBUG
 			return false;
 		}
 
@@ -73,9 +67,7 @@ namespace Crypto
 
 		if (!paddedInput || !keyStretched)
 		{
-#ifdef _DEBUG
 			printf("allocation failed\n");
-#endif // _DEBUG
 			return false;
 		}
 
@@ -92,9 +84,7 @@ namespace Crypto
 			memset(keyStretched, 0, keySize);
 			free(keyStretched);
 
-#ifdef _DEBUG
 			printf("fail\n");
-#endif // _DEBUG
 			return false;
 		}
 
@@ -102,9 +92,7 @@ namespace Crypto
 		memset(keyStretched, 0, keySize);
 		free(keyStretched);
 
-#ifdef _DEBUG
 		printf("ok\n");
-#endif // _DEBUG
 		return true;
 	}
 
@@ -116,9 +104,7 @@ namespace Crypto
 		word32 authTagSize,
 		byte* output)
 	{
-#ifdef _DEBUG
 		Log("Decrypting...");
-#endif // _DEBUG
 
 		const byte* salt = input;
 		const byte* iv = salt + saltSize;
@@ -131,9 +117,7 @@ namespace Crypto
 		byte* keyStretched = (byte*)malloc(keySize);
 		if (!keyStretched)
 		{
-#ifdef _DEBUG
 			printf("allocation failed\n");
-#endif // _DEBUG
 			return false;
 		}
 
@@ -144,18 +128,14 @@ namespace Crypto
 			memset(keyStretched, 0, keySize);
 			free(keyStretched);
 
-#ifdef _DEBUG
 			printf("fail\n");
-#endif // _DEBUG
 			return false;
 		}
 
 		memset(keyStretched, 0, keySize);
 		free(keyStretched);
 
-#ifdef _DEBUG
 		printf("ok\n");
-#endif // _DEBUG
 		return true;
 	}
 }
