@@ -14,7 +14,7 @@ Cross-platform console bot for market.csgo.com / market.dota2.net
 # Usage
 There are 2 ways to start using the program:
 1. Launch the program and enter required details manually.
-2. Put SDA's unencrypted maFile into the folder and the program will import Steam details automatically, you'll only need to enter market's API-key.
+2. Put SDA's unencrypted maFile into the folder and the program will import most details automatically.
 
 After that, you'll be asked to enter the encryption password and the details will be saved into the config.
 
