@@ -19,7 +19,7 @@ int main()
 	SetConsoleOutputCP(CP_UTF8);
 #endif // _WIN32
 
-	Log("MarketsBot v0.2.1\n");
+	Log("MarketsBot v0.2.2\n");
 
 	CURL* curl = nullptr;
 	if (curl_global_init(CURL_GLOBAL_ALL) || !(curl = curl_easy_init()))
@@ -40,14 +40,22 @@ int main()
 
 	if (!readCfg)
 	{
-		Config::Import();
+		const char* dir = GetExecDir();
+		if (dir)
+		{
+			char maFilePath[MAX_PATH];
+			bool maFileFound = FindFileByExtension(dir, ".maFile", maFilePath, sizeof(maFilePath));
+
+			if (maFileFound)
+				Config::ImportMaFile(maFilePath);
+		}
+
 		Config::Enter();
 	}
 	
-	if (
-		// let libcurl use system's default ca-bundle on linux
+	if ( 
 #ifdef _WIN32
-		!SetCACert(curl) ||
+		!SetCACert(curl) || // let libcurl use system's default ca-bundle on linux
 #endif // _WIN32
 		!Guard::Sync(curl) || !Login::DoLogin(curl) || !Login::GetSteamInfo(curl))
 	{
@@ -75,9 +83,9 @@ int main()
 	{
 		Market::Ping(curl, Config::marketApiKey);
 
-		for (int market = 0; market < MARKET_COUNT; ++market)
+		for (int marketIter = 0; marketIter < MARKET_COUNT; ++marketIter)
 		{
-			int status = Market::CheckItems(curl, market);
+			int status = Market::CheckItems(curl, marketIter);
 
 			if (status == ITEM_STATUS_GIVE)
 			{
@@ -90,14 +98,23 @@ int main()
 
 				const rapidjson::Value& offers = parsed["offers"];
 				rapidjson::SizeType offerCount = offers.Size();
+				if (offerCount < 1)
+					continue;
 
-				const auto offerIds = new char[offerCount][OFFER_ID_SIZE];
+				char (*const offerIds)[OFFER_ID_SIZE] = (char(*)[OFFER_ID_SIZE])malloc(offerCount * OFFER_ID_SIZE);
+				if (!offerIds)
+				{
+#ifdef _DEBUG
+					Log("Warning: offer ids buffer allocation failed\n");
+#endif // _DEBUG
+					continue;
+				}
 
 				rapidjson::SizeType sentCount = 0;
 
-				for (rapidjson::SizeType i = 0; i < offerCount; ++i)
+				for (rapidjson::SizeType offerIter = 0; offerIter < offerCount; ++offerIter)
 				{
-					const rapidjson::Value& offer = offers[i];
+					const rapidjson::Value& offer = offers[offerIter];
 
 					rapidjson::StringBuffer buffer;
 					rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
@@ -131,7 +148,7 @@ int main()
 				if (sentCount)
 					Guard::AcceptConfirmations(curl, offerIds, sentCount);
 
-				delete[] offerIds;
+				free(offerIds);
 			}
 			else if (status == ITEM_STATUS_TAKE)
 			{
@@ -141,7 +158,7 @@ int main()
 				char offerId[OFFER_ID_SIZE];
 				char partnerId[STEAMID64_SIZE];
 
-				if (Market::RequestTakeDetails(curl, market, offerId, partnerId))
+				if (Market::RequestTakeDetails(curl, marketIter, offerId, partnerId))
 					Offer::Accept(curl, offerId, partnerId);
 			}
 		}

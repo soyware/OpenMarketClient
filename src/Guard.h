@@ -10,8 +10,8 @@
 
 // multiply by 3 due to url encoding
 #define CONF_QUEUE_PARAMS_SIZE (sizeof("p=&a=&k=&t=&m=android&tag=") - 1 + \
-	sizeof(Config::deviceid) - 1 + \
-	sizeof(Config::steamid64) - 1 + \
+	sizeof(Config::deviceID) - 1 + \
+	sizeof(Config::steamID64) - 1 + \
 	PlainToBase64Size(WC_SHA_DIGEST_SIZE, WC_NO_NL_ENC) * 3 + \
 	sizeof("4294967295") - 1 + \
 	CONF_TAG_SIZE)
@@ -35,7 +35,7 @@ namespace Guard
 
 		if (curl_easy_perform(curl) != CURLE_OK)
 		{
-			std::cout << "request failed\n";
+			printf("request failed\n");
 			return false;
 		}
 
@@ -44,7 +44,7 @@ namespace Guard
 
 		timeDiff = time(nullptr) - atoll(parsed["response"]["server_time"].GetString());
 
-		std::cout << "ok\n";
+		printf("ok\n");
 		return true;
 	}
 
@@ -62,7 +62,7 @@ namespace Guard
 
 		if (Base64_Decode((const byte*)Config::shared, sizeof(Config::shared) - 1, sharedRaw, &sharedRawLen))
 		{
-			std::cout << "base64 decoding failed\n";
+			printf("base64 decoding failed\n");
 			return false;
 		}
 
@@ -80,7 +80,7 @@ namespace Guard
 
 		if (wc_HmacSetKey(&hmac, WC_SHA, sharedRaw, sharedRawLen) || wc_HmacUpdate(&hmac, timeArray, sizeof(timeArray)) || wc_HmacFinal(&hmac, result))
 		{
-			std::cout << "fail\n";
+			printf("fail\n");
 			return false;
 		}
 
@@ -98,7 +98,7 @@ namespace Guard
 		}
 		out[TWOFA_SIZE - 1] = '\0';
 
-		std::cout << "ok\n";
+		printf("ok\n");
 		return true;
 	}
 
@@ -150,8 +150,8 @@ namespace Guard
 			"&k=%s"
 			"&t=%lld"
 			"&m=android&tag=%s",
-			Config::deviceid,
-			Config::steamid64,
+			Config::deviceID,
+			Config::steamID64,
 			escHash,
 			GetSteamTime(),
 			tag);
@@ -168,7 +168,7 @@ namespace Guard
 		char postFields[CONF_QUEUE_PARAMS_SIZE];
 		if (!GenerateConfirmationQueryParams(curl, "conf", postFields))
 		{
-			std::cout << "query params generation failed\n";
+			printf("query params generation failed\n");
 			return false;
 		}
 
@@ -179,23 +179,23 @@ namespace Guard
 
 		if (curl_easy_perform(curl) != CURLE_OK)
 		{
-			std::cout << "request failed\n";
+			printf("request failed\n");
 			return false;
 		}
 
 		if (strstr(out->data, "Oh nooooooes!"))
 		{
-			std::cout << "fail\n";
+			printf("fail\n");
 			return false;
 		}
 
 		if (strstr(out->data, "Nothing to confirm"))
 		{
-			std::cout << "none\n";
+			printf("none\n");
 			return true;
 		}
 
-		std::cout << "ok\n";
+		printf("ok\n");
 		return true;
 	}
 
@@ -217,7 +217,7 @@ namespace Guard
 		return true;
 	}
 
-	bool AcceptConfirmations(CURL* curl, char(* const offerIds)[OFFER_ID_SIZE], size_t offerCount)
+	bool AcceptConfirmations(CURL* curl, char (*const offerIds)[OFFER_ID_SIZE], size_t offerCount)
 	{
 		CURLdata confirmations;
 		if (!FetchConfirmations(curl, &confirmations))
@@ -232,7 +232,7 @@ namespace Guard
 		if (!GenerateConfirmationQueryParams(curl, "allow", postFields))
 		{
 			delete[] postFields;
-			std::cout << "query params generation failed\n";
+			printf("query params generation failed\n");
 			return false;
 		}
 
@@ -267,7 +267,7 @@ namespace Guard
 
 		if (res != CURLE_OK)
 		{
-			std::cout << "request failed\n";
+			printf("request failed\n");
 			return false;
 		}
 
@@ -276,14 +276,14 @@ namespace Guard
 
 		if (!parsed["success"].GetBool())
 		{
-			std::cout << "request unsucceeded\n";
+			printf("request unsucceeded\n");
 			return false;
 		}
 
 		if (confCount != offerCount)
-			std::cout << "accepted " << confCount << " out of " << offerCount << '\n';
+			printf("accepted %u out of %u\n", confCount, offerCount);
 		else
-			std::cout << "ok\n";
+			printf("ok\n");
 
 		return true;
 	}

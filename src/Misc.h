@@ -4,15 +4,88 @@ void Log(const char* format, ...)
 {
 	time_t t;
 	time(&t);
-	char timedate[24];
-	strftime(timedate, sizeof(timedate), "%X %x", localtime(&t));
 
-	std::cout << timedate << ' ';
+	char timedate[24];
+	strftime(timedate, sizeof(timedate), "%X", localtime(&t));
+
+	printf("%s ", timedate);
 
 	va_list args;
 	va_start(args, format);
 	vprintf(format, args);
 	va_end(args);
+}
+
+char* GetUserInput(char* buffer, int maxCount)
+{
+	char* result = fgets(buffer, maxCount, stdin);
+	if (result)
+		buffer[strcspn(buffer, "\r\n")] = '\0';
+	return result;
+}
+
+// writes pointer to file contents heap to output
+bool ReadFile(const char* path, BYTE** output, long* outputLen)
+{
+	FILE* file = fopen(path, "rb");
+	if (!file)
+		return false;
+
+	long fsize;
+
+	if (fseek(file, 0, SEEK_END) ||
+		((fsize = ftell(file)) == -1L) ||
+		fseek(file, 0, SEEK_SET))
+	{
+		fclose(file);
+		return false;
+	}
+
+	BYTE* contents = (BYTE*)malloc(fsize);
+	if (!contents || (fread(contents, sizeof(BYTE), fsize, file) != fsize))
+	{
+		fclose(file);
+		free(contents);
+		return false;
+	}
+
+	fclose(file);
+
+	*output = contents;
+	*outputLen = fsize;
+
+	return true;
+}
+
+bool FindFileByExtension(const char* directory, const char* extension, char* outPathBuf, size_t outPathBufSize)
+{
+	std::filesystem::path path;
+	std::filesystem::path dir(directory);
+
+	for (const auto& entry : std::filesystem::directory_iterator(dir))
+	{
+		if (!entry.path().extension().compare(extension))
+		{
+			path = entry.path();
+			break;
+		}
+	}
+
+	if (path.empty())
+		return false;
+
+#ifdef _WIN32
+	const size_t pathLen = wcslen(path.c_str()) + 1;
+	if ((pathLen > outPathBufSize) ||
+		!WideCharToMultiByte(CP_UTF8, 0, path.c_str(), pathLen, outPathBuf, outPathBufSize, NULL, NULL))
+	{
+		return false;
+	}
+#else
+	strcpy_s(outPathBuf, outPathBufSize, path.c_str());
+#endif // _WIN32
+
+	return true;
 }
 
 void SetStdinEcho(bool enable)
@@ -80,8 +153,8 @@ void Pause()
 	if (getenv("PROMPT"))
 		return;
 
-	std::cout << "Press any key to exit...";
-	std::cin.ignore(2);
+	printf("Press any key to exit...");
+	getchar();
 #endif // _WIN32
 }
 

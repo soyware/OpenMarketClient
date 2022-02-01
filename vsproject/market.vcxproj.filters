@@ -15,42 +15,42 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Main.cpp">
+    <ClCompile Include="..\src\Main.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="stdafx.cpp">
+    <ClCompile Include="..\src\stdafx.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="stdafx.h">
+    <ClInclude Include="..\src\Guard.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Login.h">
+    <ClInclude Include="..\src\Captcha.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Captcha.h">
+    <ClInclude Include="..\src\Config.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Misc.h">
+    <ClInclude Include="..\src\Curl.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Market.h">
+    <ClInclude Include="..\src\Login.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Curl.h">
+    <ClInclude Include="..\src\Market.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Offer.h">
+    <ClInclude Include="..\src\Offer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Config.h">
+    <ClInclude Include="..\src\stdafx.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Guard.h">
+    <ClInclude Include="..\src\Misc.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="PKCS7.h">
+    <ClInclude Include="..\src\Crypto.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

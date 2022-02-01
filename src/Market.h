@@ -30,7 +30,7 @@ namespace Market
 
 	void Init()
 	{
-		for (size_t i = 0; i < std::size(prevItemCount); ++i)
+		for (size_t i = 0; i < MARKET_COUNT; ++i)
 			prevItemCount[i] = (rapidjson::SizeType)-1;
 	}
 
@@ -100,7 +100,7 @@ namespace Market
 					Log("%s: %s \"%s\"", marketNames[market], ((status == ITEM_STATUS_GIVE) ? "Sold" : "Bought"), name);
 				}
 				else
-					std::cout << ", \"" << name << '\"';
+					printf(", \"%s\"", name);
 			}
 		}
 
@@ -113,7 +113,7 @@ namespace Market
 			}
 		}
 		else
-			std::cout << '\n';
+			printf("\n");
 
 		return ret;
 	}
@@ -144,7 +144,7 @@ namespace Market
 
 		if (curl_easy_perform(curl) != CURLE_OK)
 		{
-			std::cout << "request failed\n";
+			printf("request failed\n");
 			return false;
 		}
 
@@ -153,7 +153,7 @@ namespace Market
 
 		if (!parsed["success"].GetBool())
 		{
-			std::cout << "request unsucceeded\n";
+			printf("request unsucceeded\n");
 			return false;
 		}
 
@@ -161,7 +161,7 @@ namespace Market
 		strncpy_s(outPartner64, STEAMID64_SIZE, &parsed["profile"].GetString()[36], (STEAMID64_SIZE - 1));
 		//strcpy_s(outSecret, MARKET_SECRET_SIZE, doc["secret"].GetString());
 		
-		std::cout << "ok\n";
+		printf("ok\n");
 		return true;
 	}
 
@@ -180,7 +180,7 @@ namespace Market
 
 		if (curl_easy_perform(curl) != CURLE_OK)
 		{
-			std::cout << "request failed\n";
+			printf("request failed\n");
 			return false;
 		}
 
@@ -190,14 +190,14 @@ namespace Market
 		{
 			rapidjson::Value::ConstMemberIterator error = outDoc->FindMember("error");
 			if (error != outDoc->MemberEnd() && !strcmp(error->value.GetString(), "nothing"))
-				std::cout << "nothing\n";
+				printf("nothing\n");
 			else
-				std::cout << "request unsucceeded\n";
+				printf("request unsucceeded\n");
 
 			return false;
 		}
 
-		std::cout << "ok\n";
+		printf("ok\n");
 		return true;
 	}
 }

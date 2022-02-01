@@ -24,7 +24,7 @@ namespace Offer
 			"&captcha="
 			"&tradeofferid="
 			"&partner="
-			"&sessionid=") - 1 + OFFER_ID_SIZE - 1 + STEAMID64_SIZE - 1 + sizeof(Config::sessionid);
+			"&sessionid=") - 1 + OFFER_ID_SIZE - 1 + STEAMID64_SIZE - 1 + sizeof(Config::sessionID);
 
 		char postFields[postFieldsSz] = "serverid=1"
 			"&captcha="
@@ -35,7 +35,7 @@ namespace Offer
 		strcat_s(postFields, sizeof(postFields), partner64);
 
 		strcat_s(postFields, sizeof(postFields), "&sessionid=");
-		strcat_s(postFields, sizeof(postFields), Config::sessionid);
+		strcat_s(postFields, sizeof(postFields), Config::sessionID);
 
 		CURLdata response;
 		curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
@@ -51,11 +51,11 @@ namespace Offer
 		{
 			long httpCode;
 			curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &httpCode);
-			std::cout << curl_easy_strerror(res) << " (" << httpCode << ")\n";
+			printf("%s (%d)\n", curl_easy_strerror(res), httpCode);
 			return false;
 		}
 
-		std::cout << "ok\n";
+		printf("ok\n");
 		return true;
 	}
 
@@ -79,7 +79,7 @@ namespace Offer
 			"&sessionid="
 			"&serverid=1"
 			"&captcha=") - 1 + 
-			STEAMID64_SIZE - 1 + OFFER_TOKEN_SIZE - 1 + OFFER_MESSAGE_SIZE - 1 + strlen(items) + sizeof(Config::sessionid);
+			STEAMID64_SIZE - 1 + OFFER_TOKEN_SIZE - 1 + OFFER_MESSAGE_SIZE - 1 + strlen(items) + sizeof(Config::sessionID);
 
 		char* postFields = new char[postFieldsSz];
 		sprintf_s(postFields, postFieldsSz,
@@ -94,7 +94,7 @@ namespace Offer
 			token,
 			message,
 			items,
-			Config::sessionid);
+			Config::sessionID);
 
 		CURLdata response;
 		curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
@@ -111,7 +111,7 @@ namespace Offer
 		{
 			long httpCode;
 			curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &httpCode);
-			std::cout << curl_easy_strerror(res) << " (" << httpCode << ")\n";
+			printf("%s (%d)\n", curl_easy_strerror(res), httpCode);
 			return false;
 		}
 
@@ -121,13 +121,13 @@ namespace Offer
 		rapidjson::Value::ConstMemberIterator tradeofferid = parsed.FindMember("tradeofferid");
 		if (tradeofferid == parsed.MemberEnd())
 		{
-			std::cout << "request unsucceeded\n";
+			printf("request unsucceeded\n");
 			return false;
 		}
 
 		strcpy_s(outOfferId, OFFER_ID_SIZE, tradeofferid->value.GetString());
 
-		std::cout << "ok\n";
+		printf("ok\n");
 		return true;
 	}
 }

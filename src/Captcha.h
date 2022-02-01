@@ -15,7 +15,7 @@ namespace Captcha
 
 		if (curl_easy_perform(curl) != CURLE_OK)
 		{
-			std::cout << "request failed\n";
+			printf("request failed\n");
 			return false;
 		}
 
@@ -27,7 +27,7 @@ namespace Captcha
 		else
 			strcpy_s(outGid, CAPTCHA_GID_SIZE, parsed["gid"].GetString());
 
-		std::cout << "ok\n";
+		printf("ok\n");
 		return true;
 	}
 
@@ -46,7 +46,7 @@ namespace Captcha
 		const char* dir = GetExecDir();
 		if (!dir)
 		{
-			std::cout << "failed to get executable's directory\n";
+			printf("failed to get executable's directory\n");
 			return false;
 		}
 
@@ -57,7 +57,7 @@ namespace Captcha
 		FILE* file = fopen(path, "wb");
 		if (!file)
 		{
-			std::cout << "file creation failed\n";
+			printf("file creation failed\n");
 			return false;
 		}
 
@@ -70,19 +70,19 @@ namespace Captcha
 
 		if (res != CURLE_OK)
 		{
-			std::cout << "request failed\n";
+			printf("request failed\n");
 			return false;
 		}
 
 		system("start \"\" \"captcha.png\"");
-
-		std::cout << "ok\n";
 #else
 		Log("Captcha link: %s\n", url);
 #endif // _WIN32
 
+		printf("ok\n");
+
 		Log("Enter the answer: ");
-		std::cin >> outAnswer;
+		while (!GetUserInput(outAnswer, CAPTCHA_ANSWER_SIZE));
 
 		return true;
 	}

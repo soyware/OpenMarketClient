@@ -31,7 +31,7 @@ namespace Login
 
 		if (res != CURLE_OK)
 		{
-			std::cout << "request failed\n";
+			printf("request failed\n");
 			return false;
 		}
 
@@ -40,7 +40,7 @@ namespace Login
 
 		if (!parsed["success"].GetBool())
 		{
-			std::cout << "request unsucceeded\n";
+			printf("request unsucceeded\n");
 			return false;
 		}
 
@@ -48,7 +48,7 @@ namespace Login
 		memcpy(outHexExponent, parsed["publickey_exp"].GetString(), EXPONENT_LEN * 2);
 		strcpy_s(outTimestamp, TIMESTAMP_LEN + 1, parsed["timestamp"].GetString());
 
-		std::cout << "ok\n";
+		printf("ok\n");
 		return true;
 	}
 
@@ -64,21 +64,21 @@ namespace Login
 		if (Base16_Decode(hexModulus, MODULUS_LEN * 2, modulus, &modSz) ||
 			Base16_Decode(hexExponent, EXPONENT_LEN * 2, exponent, &expSz))
 		{
-			std::cout << "base16 decoding failed\n";
+			printf("base16 decoding failed\n");
 			return false;
 		}
 
 		RsaKey pubKey;
 		if (wc_InitRsaKey(&pubKey, NULL))
 		{
-			std::cout << "rsa init failed\n";
+			printf("rsa init failed\n");
 			return false;
 		}
 
 		if (wc_RsaPublicKeyDecodeRaw(modulus, modSz, exponent, expSz, &pubKey))
 		{
 			wc_FreeRsaKey(&pubKey);
-			std::cout << "public key decoding failed\n";
+			printf("public key decoding failed\n");
 			return false;
 		}
 
@@ -86,7 +86,7 @@ namespace Login
 		if (wc_InitRng(&rng))
 		{
 			wc_FreeRsaKey(&pubKey);
-			std::cout << "rng init failed\n";
+			printf("rng init failed\n");
 			return false;
 		}
 
@@ -100,11 +100,11 @@ namespace Login
 
 		if (encryptionFailed)
 		{
-			std::cout << "fail\n";
+			printf("fail\n");
 			return false;
 		}
 
-		std::cout << "ok\n";
+		printf("ok\n");
 		return true;
 	}
 
@@ -154,7 +154,7 @@ namespace Login
 
 		if (curl_easy_perform(curl) != CURLE_OK)
 		{
-			std::cout << "cookie request failed\n";
+			printf("cookie request failed\n");
 			return false;
 		}
 
@@ -196,7 +196,7 @@ namespace Login
 
 		if (curl_easy_perform(curl) != CURLE_OK)
 		{
-			std::cout << "request failed\n";
+			printf("request failed\n");
 			return false;
 		}
 
@@ -208,22 +208,22 @@ namespace Login
 			rapidjson::Value::ConstMemberIterator requiresTwoFactor = parsed.FindMember("requires_twofactor");
 			if (requiresTwoFactor != parsed.MemberEnd() && requiresTwoFactor->value.GetBool())
 			{
-				std::cout << "wrong two factor code\n";
+				printf("wrong two factor code\n");
 				return false;
 			}
 
 			rapidjson::Value::ConstMemberIterator captchaNeeded = parsed.FindMember("captcha_needed");
 			if (captchaNeeded != parsed.MemberEnd() && captchaNeeded->value.GetBool())
 			{
-				std::cout << "wrong captcha\n";
+				printf("wrong captcha\n");
 				return DoLogin(curl, parsed["captcha_gid"].GetString());
 			}
 
-			std::cout << "recieved response: " << parsed["message"].GetString() << '\n';
+			printf("recieved response: %s\n", parsed["message"].GetString());
 			return false;
 		}
 
-		std::cout << "ok\n";
+		printf("ok\n");
 		return true;
 	}
 
@@ -234,7 +234,7 @@ namespace Login
 		curl_slist* cookies;
 		if ((curl_easy_getinfo(curl, CURLINFO_COOKIELIST, &cookies) != CURLE_OK) || !cookies)
 		{
-			std::cout << "fail\n";
+			printf("fail\n");
 			return false;
 		}
 
@@ -245,12 +245,12 @@ namespace Login
 		if (!sessionId)
 		{
 			curl_slist_free_all(cookies);
-			std::cout << "sessionid not found\n";
+			printf("sessionid not found\n");
 			return false;
 		}
-		strcpy_s(Config::sessionid, sizeof(Config::sessionid), strrchr(sessionId->data, '\t') + 1);
+		strcpy_s(Config::sessionID, sizeof(Config::sessionID), strrchr(sessionId->data, '\t') + 1);
 
-		if (!Config::steamid64[0])
+		if (!Config::steamID64[0])
 		{
 			curl_slist* steamId = cookies;
 			while (steamId && !strstr(steamId->data, "\tsteamLoginSecure\t"))
@@ -259,16 +259,16 @@ namespace Login
 			if (!steamId)
 			{
 				curl_slist_free_all(cookies);
-				std::cout << "steamid not found\n";
+				printf("steamid not found\n");
 				return false;
 			}
 			const char* valuestart = strrchr(steamId->data, '\t') + 1;
-			strncpy_s(Config::steamid64, sizeof(Config::steamid64), valuestart, (strchr(valuestart, '%') - valuestart));
+			strncpy_s(Config::steamID64, sizeof(Config::steamID64), valuestart, (strchr(valuestart, '%') - valuestart));
 		}
 
 		curl_slist_free_all(cookies);
 
-		std::cout << "ok\n";
+		printf("ok\n");
 		return true;
 	}
 
@@ -284,7 +284,7 @@ namespace Login
 
 		if (curl_easy_perform(curl) != CURLE_OK)
 		{
-			std::cout << "request failed\n";
+			printf("request failed\n");
 			return false;
 		}
 
@@ -307,14 +307,14 @@ namespace Login
 
 			if (curl_easy_perform(curl) != CURLE_OK)
 			{
-				std::cout << "register request failed\n";
+				printf("register request failed\n");
 				return false;
 			}
 
 			const char* keystart2 = strstr(registerpage.data, ">Key: ");
 			if (!keystart2)
 			{
-				std::cout << "fail\n";
+				printf("fail\n");
 				return false;
 			}
 
@@ -322,7 +322,7 @@ namespace Login
 			strncpy_s(Config::steamapikey, sizeof(Config::steamapikey), keystart2, (strchr(keystart2, '<') - keystart2));
 		}
 
-		std::cout << "ok\n";
+		printf("ok\n");
 		return true;
 	}
 	*/
