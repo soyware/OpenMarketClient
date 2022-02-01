@@ -51,7 +51,7 @@ namespace Config
 		return result;
 	}
 
-	const char		fieldDelimiter[] = "\n";
+	const char		fieldDelimiter = '\n';
 	const char		filename[] = "config";
 
 	const size_t	encryptionPassSize = 64;
@@ -129,7 +129,10 @@ namespace Config
 		for (size_t i = 0; i < fieldCount; ++i)
 		{
 			strcat_s(fieldsBuffer, sizeof(fieldsBuffer), fields[i]);
-			strcat_s(fieldsBuffer, sizeof(fieldsBuffer), fieldDelimiter);
+
+			const size_t fieldLen = strlen(fieldsBuffer);
+			fieldsBuffer[fieldLen] = fieldDelimiter;
+			fieldsBuffer[fieldLen + 1] = '\0';
 		}
 
 		const size_t fieldsLen = strlen(fieldsBuffer);
@@ -244,7 +247,7 @@ namespace Config
 
 		for (size_t i = 0; i < fieldCount; ++i)
 		{
-			const byte* fieldEnd = (byte*)memchr(fieldStart, (int)fieldDelimiter[0], fieldSizes[i]);
+			const byte* fieldEnd = (byte*)memchr(fieldStart, (int)fieldDelimiter, fieldSizes[i]);
 			const size_t fieldLen = (fieldEnd - fieldStart);
 			memcpy(fields[i], fieldStart, fieldLen);
 			fields[i][fieldLen] = '\0';
