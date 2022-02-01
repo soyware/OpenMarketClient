@@ -25,7 +25,16 @@ size_t curl_write_function(void* contents, size_t size, size_t nmemb, void* user
 	size_t realSize = size * nmemb;
 	CURLdata* dataStruct = (CURLdata*)userp;
 
-	dataStruct->data = (char*)realloc(dataStruct->data, dataStruct->size + realSize + 1);
+	char* newMem = (char*)realloc(dataStruct->data, dataStruct->size + realSize + 1);
+	if (!newMem)
+	{
+#ifdef _DEBUG
+		Log("Warning: curl write callback realloc failed\n");
+#endif // _DEBUG
+		return 0;
+	}
+
+	dataStruct->data = newMem;
 	memcpy(&(dataStruct->data[dataStruct->size]), contents, realSize);
 	dataStruct->size += realSize;
 	dataStruct->data[dataStruct->size] = '\0';
