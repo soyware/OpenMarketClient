@@ -256,7 +256,7 @@ namespace Config
 			fieldStart = fieldEnd + 1;
 		}
 
-		memset(plaintextData, 0, fileSize);
+		memset(plaintextData, 0, plaintextDataPaddedSize);
 		free(plaintextData);
 
 		return true;
