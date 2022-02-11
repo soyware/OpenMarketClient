@@ -204,9 +204,10 @@ namespace Config
 		strcpy_s(path, sizeof(path), dir);
 		strcat_s(path, sizeof(path), filename);
 
-		BYTE* contents = nullptr;
-		long contentsLen = 0;
-		if (!ReadFile(path, &contents, &contentsLen))
+		BYTE* fileContents = nullptr;
+		long fileSize = 0;
+
+		if (!ReadFile(path, &fileContents, &fileSize))
 		{
 			printf("failed to read or not found\n");
 			return false;
@@ -214,7 +215,8 @@ namespace Config
 
 		printf("ok\n");
 
-		byte* decryptedContents = (byte*)malloc(contentsLen);
+		const size_t plaintextDataPaddedSize = fileSize - saltSize - ivSize - authTagSize;
+		byte* plaintextData = (byte*)malloc(plaintextDataPaddedSize);
 
 		SetStdinEcho(false);
 
@@ -226,9 +228,9 @@ namespace Config
 
 			printf("\n");
 
-			if (Crypto::Decrypt(contents, contentsLen, decryptPass,
+			if (Crypto::Decrypt(fileContents, fileSize, decryptPass,
 				keySize, pbkdfIterationCount, pbkdfHashAlgo,
-				saltSize, ivSize, authTagSize, decryptedContents))
+				saltSize, ivSize, authTagSize, plaintextData))
 			{
 				memset(decryptPass, 0, sizeof(decryptPass));
 				break;
@@ -237,9 +239,13 @@ namespace Config
 
 		SetStdinEcho(true);
 
-		free(contents);
+		free(fileContents);
 
-		const byte* fieldStart = decryptedContents;
+		// trim the padding from the plaintext
+		const BYTE paddingSize = plaintextData[plaintextDataPaddedSize - 1];
+		plaintextData[plaintextDataPaddedSize - paddingSize] = '\0';
+
+		const byte* fieldStart = plaintextData;
 
 		for (size_t i = 0; i < fieldCount; ++i)
 		{
@@ -250,8 +256,8 @@ namespace Config
 			fieldStart = fieldEnd + 1;
 		}
 
-		memset(decryptedContents, 0, contentsLen);
-		free(decryptedContents);
+		memset(plaintextData, 0, fileSize);
+		free(plaintextData);
 
 		return true;
 	}
