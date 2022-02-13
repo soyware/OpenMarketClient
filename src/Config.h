@@ -220,7 +220,8 @@ namespace Config
 
 		SetStdinEcho(false);
 
-		do {
+		while (true)
+		{
 			Log("Enter config decryption password: ");
 
 			char decryptPass[encryptionPassSize];
@@ -235,7 +236,7 @@ namespace Config
 				memset(decryptPass, 0, sizeof(decryptPass));
 				break;
 			}
-		} while (true);
+		}
 
 		SetStdinEcho(true);
 
