@@ -73,8 +73,6 @@ int main()
 #ifdef _WIN32
 	// prevent sleep
 	SetThreadExecutionState(ES_CONTINUOUS | ES_SYSTEM_REQUIRED);
-	
-	HWND hWnd = GetConsoleWindow();
 #endif // _WIN32
 
 	Market::Init();
@@ -90,7 +88,7 @@ int main()
 			if (status == ITEM_STATUS_GIVE)
 			{
 #ifdef _WIN32
-				FlashWindow(hWnd, TRUE);
+				FlashCurrentWindow();
 #endif // _WIN32
 				rapidjson::Document parsed;
 				if (!Market::RequestGiveDetails(curl, &parsed))
@@ -153,7 +151,7 @@ int main()
 			else if (status == ITEM_STATUS_TAKE)
 			{
 #ifdef _WIN32
-				FlashWindow(hWnd, TRUE);
+				FlashCurrentWindow();
 #endif // _WIN32
 				char offerId[OFFER_ID_SIZE];
 				char partnerId[STEAMID64_SIZE];

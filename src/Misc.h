@@ -16,11 +16,23 @@ void Log(const char* format, ...)
 	va_end(args);
 }
 
+bool FlashCurrentWindow()
+{
+	static const HWND hWnd = GetConsoleWindow();
+	if (!hWnd)
+		return false;
+
+	return FlashWindow(hWnd, TRUE);
+}
+
 char* GetUserInput(char* buffer, int maxCount)
 {
+	FlashCurrentWindow();
+
 	char* result = fgets(buffer, maxCount, stdin);
 	if (result)
 		buffer[strcspn(buffer, "\r\n")] = '\0';
+
 	return result;
 }
 
