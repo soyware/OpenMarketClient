@@ -16,13 +16,13 @@ void Log(const char* format, ...)
 	va_end(args);
 }
 
-BOOL FlashCurrentWindow()
+void FlashCurrentWindow()
 {
 	static const HWND hWnd = GetConsoleWindow();
 	if (!hWnd)
-		return false;
+		return;
 
-	return FlashWindow(hWnd, TRUE);
+	FlashWindow(hWnd, TRUE);
 }
 
 char* GetUserInput(char* buffer, int maxCount)
