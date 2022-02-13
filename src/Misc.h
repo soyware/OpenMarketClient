@@ -16,7 +16,7 @@ void Log(const char* format, ...)
 	va_end(args);
 }
 
-bool FlashCurrentWindow()
+BOOL FlashCurrentWindow()
 {
 	static const HWND hWnd = GetConsoleWindow();
 	if (!hWnd)
