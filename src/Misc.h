@@ -30,9 +30,12 @@ char* GetUserInput(char* buffer, int maxCount)
 #ifdef _WIN32
 	FlashCurrentWindow();
 #endif
-	char* result = fgets(buffer, maxCount, stdin);
-	if (result)
-		buffer[strcspn(buffer, "\r\n")] = '\0';
+	char* result;
+	do {
+		result = fgets(buffer, maxCount, stdin);
+	} while (!result || !result[0]);
+
+	buffer[strcspn(buffer, "\r\n")] = '\0';
 
 	return result;
 }

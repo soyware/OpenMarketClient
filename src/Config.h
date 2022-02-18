@@ -69,14 +69,14 @@ namespace Config
 		if (!username[0])
 		{
 			Log("Enter Steam username: ");
-			while (!GetUserInput(username, sizeof(username)));
+			GetUserInput(username, sizeof(username));
 		}
 		
 		if (!password[0])
 		{
 			Log("Enter Steam password: ");
 			SetStdinEcho(false);
-			while (!GetUserInput(password, sizeof(password)));
+			GetUserInput(password, sizeof(password));
 			SetStdinEcho(true);
 			printf("\n");
 		}
@@ -84,25 +84,25 @@ namespace Config
 		if (!shared[0])
 		{
 			Log("Enter Steam Guard shared_secret: ");
-			while (!GetUserInput(shared, sizeof(shared)));
+			GetUserInput(shared, sizeof(shared));
 		}
 
 		if (!identity[0])
 		{
 			Log("Enter Steam Guard identity_secret: ");
-			while (!GetUserInput(identity, sizeof(identity)));
+			GetUserInput(identity, sizeof(identity));
 		}
 
 		if (!deviceID[0])
 		{
 			Log("Enter Steam Guard device_id: ");
-			while (!GetUserInput(deviceID, sizeof(deviceID)));
+			GetUserInput(deviceID, sizeof(deviceID));
 		}
 
 		if (!marketApiKey[0])
 		{
 			Log("Enter market's API-key: ");
-			while (!GetUserInput(marketApiKey, sizeof(marketApiKey)));
+			GetUserInput(marketApiKey, sizeof(marketApiKey));
 		}
 	}
 
@@ -118,7 +118,7 @@ namespace Config
 
 		char encryptPass[encryptionPassSize];
 		SetStdinEcho(false);
-		while (!GetUserInput(encryptPass, sizeof(encryptPass)));
+		GetUserInput(encryptPass, sizeof(encryptPass));
 		SetStdinEcho(true);
 		printf("\n");
 
@@ -225,7 +225,7 @@ namespace Config
 			Log("Enter config decryption password: ");
 
 			char decryptPass[encryptionPassSize];
-			while (!GetUserInput(decryptPass, sizeof(decryptPass)));
+			GetUserInput(decryptPass, sizeof(decryptPass));
 
 			printf("\n");
 

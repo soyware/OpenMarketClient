@@ -82,7 +82,7 @@ namespace Captcha
 		printf("ok\n");
 
 		Log("Enter captcha text: ");
-		while (!GetUserInput(outAnswer, CAPTCHA_ANSWER_SIZE));
+		GetUserInput(outAnswer, CAPTCHA_ANSWER_SIZE);
 
 		return true;
 	}
