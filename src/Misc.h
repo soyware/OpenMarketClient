@@ -171,7 +171,7 @@ void Pause()
 	if (getenv("PROMPT"))
 		return;
 
-	printf("Press any key to exit...");
+	printf("Press any key to continue...");
 	getchar();
 #endif // _WIN32
 }
