@@ -171,8 +171,10 @@ void Pause()
 	if (getenv("PROMPT"))
 		return;
 
-	printf("Press any key to continue...");
-	getchar();
+	printf("Press Enter to continue...");
+
+	int c;
+	while ((c = getchar()) != '\n' && c != EOF);
 #endif // _WIN32
 }
 
