@@ -183,6 +183,7 @@ namespace Config
 			(fwrite(authTag, sizeof(byte), authTagSize, file)	!= authTagSize) ||
 			(fwrite(encrypted, sizeof(byte), encryptedLen, file) != encryptedLen))
 		{
+			fclose(file);
 			printf("failed to write\n");
 			return false;
 		}
