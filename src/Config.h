@@ -174,14 +174,18 @@ namespace Config
 		FILE* file = fopen(path, "wb");
 		if (!file)
 		{
-			printf("fail\n");
+			printf("failed to open\n");
 			return false;
 		}
 
-		fwrite(salt, sizeof(byte), saltSize, file);
-		fwrite(iv, sizeof(byte), ivSize, file);
-		fwrite(authTag, sizeof(byte), authTagSize, file);
-		fwrite(encrypted, sizeof(byte), encryptedLen, file);
+		if ((fwrite(salt, sizeof(byte), saltSize, file)			!= saltSize) ||
+			(fwrite(iv, sizeof(byte), ivSize, file)				!= ivSize) ||
+			(fwrite(authTag, sizeof(byte), authTagSize, file)	!= authTagSize) ||
+			(fwrite(encrypted, sizeof(byte), encryptedLen, file) != encryptedLen))
+		{
+			printf("failed to write\n");
+			return false;
+		}
 
 		fclose(file);
 

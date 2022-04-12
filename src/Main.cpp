@@ -21,20 +21,13 @@ int main()
 
 	Log("MarketsBot v0.2.2\n");
 
-	CURL* curl = nullptr;
-	if (curl_global_init(CURL_GLOBAL_ALL) || !(curl = curl_easy_init()))
+	CURL* curl = Curl::Init();
+	if (!curl)
 	{
 		Log("Libcurl init failed\n");
-		curl_easy_cleanup(curl);
-		curl_global_cleanup();
 		Pause();
 		return 1;
 	}
-
-	curl_easy_setopt(curl, CURLOPT_TIMEOUT, 20L);
-	curl_easy_setopt(curl, CURLOPT_IPRESOLVE, CURL_IPRESOLVE_V4);
-	curl_easy_setopt(curl, CURLOPT_FAILONERROR, 1L);
-	curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
 
 	bool readCfg = Config::Read();
 
@@ -55,7 +48,7 @@ int main()
 	
 	if ( 
 #ifdef _WIN32
-		!SetCACert(curl) || // let libcurl use system's default ca-bundle on linux
+		!Curl::SetCACert(curl) || // let libcurl use system's default ca-bundle on linux
 #endif // _WIN32
 		!Guard::Sync(curl) || !Login::DoLogin(curl) || !Login::GetSteamInfo(curl))
 	{
