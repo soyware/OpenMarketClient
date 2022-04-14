@@ -1,5 +1,5 @@
-# MarketsBot
-Cross-platform console bot for market.csgo.com / market.dota2.net
+# OpenMarketClient
+Unofficial open-source cross-platform console client for [market.csgo.com](https://market.csgo.com) and [market.dota2.net](https://market.dota2.net)
 
 ![screenshot](screenshot.png)
 
