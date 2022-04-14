@@ -19,7 +19,7 @@ int main()
 	SetConsoleOutputCP(CP_UTF8);
 #endif // _WIN32
 
-	Log("MarketsBot v0.2.2\n");
+	Log("OpenMarketClient v0.2.2\n");
 
 	CURL* curl = Curl::Init();
 	if (!curl)
