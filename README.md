@@ -8,7 +8,7 @@ Unofficial open-source cross-platform console client for [market.csgo.com](https
 * Sends sold items
 * Receives bought items
 * Accepts Steam Guard confirmations
-* Ability to import SDA's maFile (simply put it in a folder)
+* Ability to import SteamDesktopAuthenticator's maFile (simply put it in a folder)
 * Password encrypted config
 
 # Usage
