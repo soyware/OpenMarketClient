@@ -18,7 +18,7 @@ There are 2 ways to start using the program:
 
 After that, you'll be asked to enter the encryption password and the details will be saved into the config.
 
-# Required details
+## Required details
 * Market's API-key ([you can get one here](https://market.csgo.com/docs-v2))
 * Steam username
 * Steam password
