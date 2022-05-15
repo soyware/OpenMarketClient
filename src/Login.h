@@ -13,7 +13,7 @@ namespace Login
 		Log("Getting RSA public key...");
 
 		const size_t postFieldSz = sizeof("username=") + strlen(escUsername);
-		char* postField = new char[postFieldSz];
+		char* postField = (char*)malloc(postFieldSz);
 
 		strcpy_s(postField, postFieldSz, "username=");
 		strcat_s(postField, postFieldSz, escUsername);
@@ -27,7 +27,7 @@ namespace Login
 
 		CURLcode res = curl_easy_perform(curl);
 
-		delete[] postField;
+		free(postField);
 
 		if (res != CURLE_OK)
 		{

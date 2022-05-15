@@ -85,7 +85,7 @@ char* GetUserInputString(const char* msg, char* buffer, int maxCount, bool echoS
 int GetUserInputInt(const char* msg, int min, int max)
 {
 	const size_t msgMinMaxSize = strlen(msg) + sizeof(" (-2147483647-2147483647)");
-	char* msgMinMax = new char[msgMinMaxSize];
+	char* msgMinMax = (char*)malloc(msgMinMaxSize);
 	sprintf_s(msgMinMax, msgMinMaxSize, "%s (%d-%d)", msg, min, max);
 
 	int result = 0;
@@ -98,7 +98,7 @@ int GetUserInputInt(const char* msg, int min, int max)
 
 	} while (min > result || result > max);
 
-	delete[] msgMinMax;
+	free(msgMinMax);
 
 	return result;
 }

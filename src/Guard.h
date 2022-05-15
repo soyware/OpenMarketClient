@@ -228,10 +228,10 @@ namespace Guard
 		const size_t confParamsLen = (sizeof("&cid[]=&ck[]=") - 1 + CONF_ID_SIZE - 1 + CONF_KEY_SIZE - 1);
 		const size_t postFieldsSz = CONF_QUEUE_PARAMS_SIZE - 1 + sizeof("&op=allow") + offerCount * confParamsLen;
 
-		char* postFields = new char[postFieldsSz];
+		char* postFields = (char*)malloc(postFieldsSz);
 		if (!GenerateConfirmationQueryParams(curl, "allow", postFields))
 		{
-			delete[] postFields;
+			free(postFields);
 			printf("query params generation failed\n");
 			return false;
 		}
@@ -263,7 +263,7 @@ namespace Guard
 
 		CURLcode res = curl_easy_perform(curl);
 
-		delete[] postFields;
+		free(postFields);
 
 		if (res != CURLE_OK)
 		{

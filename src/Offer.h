@@ -81,7 +81,7 @@ namespace Offer
 			"&captcha=") - 1 + 
 			STEAMID64_SIZE - 1 + OFFER_TOKEN_SIZE - 1 + OFFER_MESSAGE_SIZE - 1 + strlen(items) + sizeof(Config::sessionID);
 
-		char* postFields = new char[postFieldsSz];
+		char* postFields = (char*)malloc(postFieldsSz);
 		sprintf_s(postFields, postFieldsSz,
 			"partner=%llu"
 			"&trade_offer_create_params={\"trade_offer_access_token\":\"%s\"}"
@@ -104,7 +104,7 @@ namespace Offer
 
 		CURLcode res = curl_easy_perform(curl);
 
-		delete[] postFields;
+		free(postFields);
 		curl_easy_setopt(curl, CURLOPT_REFERER, NULL);
 
 		if (res != CURLE_OK)
