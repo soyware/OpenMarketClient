@@ -64,7 +64,7 @@ char* GetUserInputString(const char* msg, char* buffer, int maxCount, bool echoS
 		if (!echoStdin)
 			SetStdinEcho(false);
 
-		bool res = fgets(buffer, maxCount, stdin);
+		char* res = fgets(buffer, maxCount, stdin);
 
 		if (!echoStdin)
 		{
@@ -84,12 +84,12 @@ char* GetUserInputString(const char* msg, char* buffer, int maxCount, bool echoS
 
 int GetUserInputInt(const char* msg, int min, int max)
 {
+	char msgMinMax[128];
+	sprintf_s(msgMinMax, sizeof(msgMinMax), "%s (%d-%d)", msg, min, max);
+
 	int result = 0;
 
 	do {
-		char msgMinMax[128];
-		sprintf_s(msgMinMax, sizeof(msgMinMax), "%s (%d-%d): ", msg, min, max);
-
 		char buff[128];
 		GetUserInputString(msgMinMax, buff, sizeof(buff));
 
