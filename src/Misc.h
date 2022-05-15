@@ -25,17 +25,77 @@ void FlashCurrentWindow()
 	FlashWindow(hWnd, TRUE);
 }
 
-char* GetUserInput(char* buffer, int maxCount)
+void SetStdinEcho(bool enable)
+{
+#ifdef _WIN32
+	HANDLE hStdin = GetStdHandle(STD_INPUT_HANDLE);
+	DWORD mode;
+	GetConsoleMode(hStdin, &mode);
+
+	if (!enable)
+		mode &= ~ENABLE_ECHO_INPUT;
+	else
+		mode |= ENABLE_ECHO_INPUT;
+
+	SetConsoleMode(hStdin, mode);
+
+#else
+	termios tty;
+	tcgetattr(STDIN_FILENO, &tty);
+
+	if (!enable)
+		tty.c_lflag &= ~ECHO;
+	else
+		tty.c_lflag |= ECHO;
+
+	tcsetattr(STDIN_FILENO, TCSANOW, &tty);
+#endif // _WIN32
+}
+
+char* GetUserInputString(const char* msg, char* buffer, int maxCount, bool echo = true)
 {
 #ifdef _WIN32
 	FlashCurrentWindow();
 #endif
-	char* result;
-	do {
-		result = fgets(buffer, maxCount, stdin);
-	} while (!result || !result[0]);
 
-	buffer[strcspn(buffer, "\r\n")] = '\0';
+	do {
+		Log("%s: ", msg);
+
+		if (!echo)
+			SetStdinEcho(false);
+
+		bool res = fgets(buffer, maxCount, stdin);
+
+		if (!echo)
+		{
+			SetStdinEcho(true);
+			printf("\n");
+		}
+
+		if (!res)
+			continue;
+
+		buffer[strcspn(buffer, "\r\n")] = '\0';
+
+	} while (!buffer || !buffer[0]);
+
+	return buffer;
+}
+
+int GetUserInputInt(const char* msg, int min, int max)
+{
+	int result = 0;
+
+	do {
+		char msgMinMax[128];
+		sprintf_s(msgMinMax, sizeof(msgMinMax), "%s (%d-%d): ", msg, min, max);
+
+		char buff[128];
+		GetUserInputString(msgMinMax, buff, sizeof(buff));
+
+		result = atoi(buff);
+
+	} while (min > result || result > max);
 
 	return result;
 }
@@ -102,33 +162,6 @@ bool FindFileByExtension(const char* directory, const char* extension, char* out
 #endif // _WIN32
 
 	return true;
-}
-
-void SetStdinEcho(bool enable)
-{
-#ifdef _WIN32
-	HANDLE hStdin = GetStdHandle(STD_INPUT_HANDLE);
-	DWORD mode;
-	GetConsoleMode(hStdin, &mode);
-
-	if (!enable)
-		mode &= ~ENABLE_ECHO_INPUT;
-	else
-		mode |= ENABLE_ECHO_INPUT;
-
-	SetConsoleMode(hStdin, mode);
-
-#else
-	termios tty;
-	tcgetattr(STDIN_FILENO, &tty);
-
-	if (!enable)
-		tty.c_lflag &= ~ECHO;
-	else
-		tty.c_lflag |= ECHO;
-
-	tcsetattr(STDIN_FILENO, TCSANOW, &tty);
-#endif // _WIN32
 }
 
 // get executable dir

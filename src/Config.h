@@ -67,43 +67,22 @@ namespace Config
 	void Enter()
 	{
 		if (!username[0])
-		{
-			Log("Enter Steam username: ");
-			GetUserInput(username, sizeof(username));
-		}
+			GetUserInputString("Enter Steam username", username, sizeof(username));
 		
 		if (!password[0])
-		{
-			Log("Enter Steam password: ");
-			SetStdinEcho(false);
-			GetUserInput(password, sizeof(password));
-			SetStdinEcho(true);
-			printf("\n");
-		}
+			GetUserInputString("Enter Steam password", password, sizeof(password), false);
 
 		if (!shared[0])
-		{
-			Log("Enter Steam Guard shared_secret: ");
-			GetUserInput(shared, sizeof(shared));
-		}
+			GetUserInputString("Enter Steam Guard shared_secret", shared, sizeof(shared));
 
 		if (!identity[0])
-		{
-			Log("Enter Steam Guard identity_secret: ");
-			GetUserInput(identity, sizeof(identity));
-		}
+			GetUserInputString("Enter Steam Guard identity_secret", identity, sizeof(identity));
 
 		if (!deviceID[0])
-		{
-			Log("Enter Steam Guard device_id: ");
-			GetUserInput(deviceID, sizeof(deviceID));
-		}
+			GetUserInputString("Enter Steam Guard device_id", deviceID, sizeof(deviceID));
 
 		if (!marketApiKey[0])
-		{
-			Log("Enter market's API-key: ");
-			GetUserInput(marketApiKey, sizeof(marketApiKey));
-		}
+			GetUserInputString("Enter market's API-key", marketApiKey, sizeof(marketApiKey));
 	}
 
 	void ZeroLoginDetails()
@@ -114,11 +93,9 @@ namespace Config
 
 	bool Write()
 	{
-		Log("Enter config encryption password: ");
-
 		char encryptPass[encryptionPassSize];
 		SetStdinEcho(false);
-		GetUserInput(encryptPass, sizeof(encryptPass));
+		GetUserInputString("Enter config encryption password", encryptPass, sizeof(encryptPass));
 		SetStdinEcho(true);
 		printf("\n");
 
@@ -227,10 +204,8 @@ namespace Config
 
 		while (true)
 		{
-			Log("Enter config decryption password: ");
-
 			char decryptPass[encryptionPassSize];
-			GetUserInput(decryptPass, sizeof(decryptPass));
+			GetUserInputString("Enter config decryption password", decryptPass, sizeof(decryptPass));
 
 			printf("\n");
 

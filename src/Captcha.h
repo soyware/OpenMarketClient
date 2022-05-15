@@ -81,8 +81,7 @@ namespace Captcha
 
 		printf("ok\n");
 
-		Log("Enter captcha text: ");
-		GetUserInput(outAnswer, CAPTCHA_ANSWER_SIZE);
+		GetUserInputString("Enter captcha text", outAnswer, CAPTCHA_ANSWER_SIZE);
 
 		return true;
 	}
