@@ -94,10 +94,7 @@ namespace Config
 	bool Write()
 	{
 		char encryptPass[encryptionPassSize];
-		SetStdinEcho(false);
-		GetUserInputString("Enter config encryption password", encryptPass, sizeof(encryptPass));
-		SetStdinEcho(true);
-		printf("\n");
+		GetUserInputString("Enter config encryption password", encryptPass, sizeof(encryptPass), false);
 
 		constexpr size_t fieldsSize = GetFieldsSize();
 
@@ -200,12 +197,10 @@ namespace Config
 		const size_t plaintextDataPaddedSize = fileSize - saltSize - ivSize - authTagSize;
 		byte* plaintextData = (byte*)malloc(plaintextDataPaddedSize);
 
-		SetStdinEcho(false);
-
 		while (true)
 		{
 			char decryptPass[encryptionPassSize];
-			GetUserInputString("Enter config decryption password", decryptPass, sizeof(decryptPass));
+			GetUserInputString("Enter config decryption password", decryptPass, sizeof(decryptPass), false);
 
 			printf("\n");
 
@@ -217,8 +212,6 @@ namespace Config
 				break;
 			}
 		}
-
-		SetStdinEcho(true);
 
 		free(fileContents);
 

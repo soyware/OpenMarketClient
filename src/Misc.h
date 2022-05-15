@@ -52,7 +52,7 @@ void SetStdinEcho(bool enable)
 #endif // _WIN32
 }
 
-char* GetUserInputString(const char* msg, char* buffer, int maxCount, bool echo = true)
+char* GetUserInputString(const char* msg, char* buffer, int maxCount, bool echoStdin = true)
 {
 #ifdef _WIN32
 	FlashCurrentWindow();
@@ -61,12 +61,12 @@ char* GetUserInputString(const char* msg, char* buffer, int maxCount, bool echo 
 	do {
 		Log("%s: ", msg);
 
-		if (!echo)
+		if (!echoStdin)
 			SetStdinEcho(false);
 
 		bool res = fgets(buffer, maxCount, stdin);
 
-		if (!echo)
+		if (!echoStdin)
 		{
 			SetStdinEcho(true);
 			printf("\n");
