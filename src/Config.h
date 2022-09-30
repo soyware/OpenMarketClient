@@ -202,8 +202,6 @@ namespace Config
 			char decryptPass[encryptionPassSize];
 			GetUserInputString("Enter config decryption password", decryptPass, sizeof(decryptPass), false);
 
-			printf("\n");
-
 			if (Crypto::Decrypt(fileContents, fileSize, decryptPass,
 				keySize, pbkdfIterationCount, pbkdfHashAlgo,
 				saltSize, ivSize, authTagSize, plaintextData))

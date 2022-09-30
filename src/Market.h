@@ -165,12 +165,22 @@ namespace Market
 		return true;
 	}
 
-	bool RequestGiveDetails(CURL* curl, rapidjson::Document* outDoc)
+	bool RequestGiveDetails(CURL* curl, int market, rapidjson::Document* outDoc)
 	{
 		Log("Requesting details to send items...");
 
-		const size_t urlSz = sizeof("https://market.csgo.com/api/v2/trade-request-give-p2p-all?key=") - 1 + sizeof(Config::marketApiKey);
-		char url[urlSz] = "https://market.csgo.com/api/v2/trade-request-give-p2p-all?key=";
+		const size_t urlSz = sizeof("https://market.dota2.net/api/v2/trade-request-give-p2p-all?key=") - 1 + sizeof(Config::marketApiKey);
+		char url[urlSz];
+		switch (market)
+		{
+		case MARKET_DOTA:
+			strcpy_s(url, sizeof(url), "https://market.dota2.net/api/v2/trade-request-give-p2p-all?key=");
+			break;
+
+		case MARKET_CSGO:
+			strcpy_s(url, sizeof(url), "https://market.csgo.com/api/v2/trade-request-give-p2p-all?key=");
+			break;
+		}
 		strcat_s(url, sizeof(url), Config::marketApiKey);
 
 		curl_easy_setopt(curl, CURLOPT_URL, url);

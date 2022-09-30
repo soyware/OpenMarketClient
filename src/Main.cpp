@@ -19,7 +19,7 @@ int main()
 	SetConsoleOutputCP(CP_UTF8);
 #endif // _WIN32
 
-	Log("OpenMarketClient v0.2.2\n");
+	Log("OpenMarketClient v0.2.2-hotfix\n");
 
 	CURL* curl = Curl::Init();
 	if (!curl)
@@ -84,7 +84,7 @@ int main()
 				FlashCurrentWindow();
 #endif // _WIN32
 				rapidjson::Document parsed;
-				if (!Market::RequestGiveDetails(curl, &parsed))
+				if (!Market::RequestGiveDetails(curl, marketIter, &parsed))
 					continue;
 
 				const rapidjson::Value& offers = parsed["offers"];
