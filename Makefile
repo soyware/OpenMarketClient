@@ -1,29 +1,29 @@
 CXX=g++
-CXXFLAGS=-std=c++17 -O2 -Wall -D_FORTIFY_SOURCE=2 -fstack-protector-all
-LDLIBS=-lpthread -lcurl -lwolfssl -lstdc++fs
+CXXFLAGS=-std=c++17 -O2 -Wall
+LDLIBS=-Wl,-rpath -Wl,/usr/local/lib/ -lpthread -lcurl -lwolfssl -lstdc++fs
 INCLUDES=-I../libs/wolfssl -I../libs/curl/include -I../libs/rapidjson/include
-TARGET=market
+SRCFOLDER=src
+PCH=Precompiled
 OUTDIR=build/linux
+TARGET=OpenMarketClient
 
 all: $(OUTDIR)/$(TARGET)
 
-$(OUTDIR)/$(TARGET): $(OUTDIR)/stdafx.h.gch \
-	$(TARGET)/Captcha.h \
-	$(TARGET)/Config.h \
-	$(TARGET)/Curl.h \
-	$(TARGET)/Guard.h \
-	$(TARGET)/Login.h \
-	$(TARGET)/Market.h \
-	$(TARGET)/Misc.h \
-	$(TARGET)/Offer.h \
-	$(TARGET)/PKCS7.h \
-	$(TARGET)/Main.cpp
+$(OUTDIR)/$(TARGET): $(OUTDIR)/$(PCH).h.gch \
+	$(SRCFOLDER)/Misc.h \
+	$(SRCFOLDER)/Curl.h \
+	$(SRCFOLDER)/Crypto.h \
+	$(SRCFOLDER)/Steam/Misc.h \
+	$(SRCFOLDER)/Steam/Captcha.h \
+	$(SRCFOLDER)/Steam/Trade.h \
+	$(SRCFOLDER)/Steam/Guard.h \
+	$(SRCFOLDER)/Steam/Auth.h \
+	$(SRCFOLDER)/Market.h \
+	$(SRCFOLDER)/Account.h \
+	$(SRCFOLDER)/Main.cpp
 	mkdir -p $(OUTDIR)
-	$(CXX) $(CXXFLAGS) -include $(OUTDIR)/stdafx.h $(INCLUDES) $(TARGET)/Main.cpp -o $@ $(LDLIBS)
+	$(CXX) $(CXXFLAGS) -include $(OUTDIR)/$(PCH).h $(INCLUDES) $(SRCFOLDER)/Main.cpp -o $@ $(LDLIBS)
 
-$(OUTDIR)/stdafx.h.gch: $(TARGET)/stdafx.h
+$(OUTDIR)/$(PCH).h.gch: $(SRCFOLDER)/$(PCH).h
 	mkdir -p $(OUTDIR)
-	$(CXX) $(CXXFLAGS) $(INCLUDES) $(TARGET)/stdafx.h -o $@
-
-clean:
-	rm -rf $(OUTDIR)
+	$(CXX) $(CXXFLAGS) $(INCLUDES) $(SRCFOLDER)/$(PCH).h -o $@

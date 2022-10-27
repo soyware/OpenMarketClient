@@ -1,141 +1,206 @@
 #pragma once
 
+#ifndef BASE64_LINE_SZ
+#define BASE64_LINE_SZ 64
+#endif // !BASE64_LINE_SZ
+
+// Source: https://github.com/wolfSSL/wolfssl/blob/master/wolfcrypt/src/coding.c
+constexpr word32 Base64ToPlainSize(size_t inLen)
+{
+	word32 plainSz = inLen - ((inLen + (BASE64_LINE_SZ - 1)) / BASE64_LINE_SZ);
+	plainSz = (plainSz * 3 + 3) / 4;
+	return plainSz;
+}
+
+constexpr word32 PlainToBase64Size(size_t inLen, Escaped escaped)
+{
+	word32 outSz = (inLen + 3 - 1) / 3 * 4;
+	word32 addSz = (outSz + BASE64_LINE_SZ - 1) / BASE64_LINE_SZ;  /* new lines */
+
+	if (escaped == WC_ESC_NL_ENC)
+		addSz *= 3;   /* instead of just \n, we're doing %0A triplet */
+	else if (escaped == WC_NO_NL_ENC)
+		addSz = 0;    /* encode without \n */
+
+	outSz += addSz;
+
+	return outSz;
+}
+
+// whole PKCS7 is too heavy
+#ifndef HAVE_PKCS7
+// Source: https://github.com/wolfSSL/wolfssl/blob/master/wolfcrypt/src/pkcs7.c
+/* return size of padded data, padded to blockSz chunks, or negative on error */
+constexpr int wc_PKCS7_GetPadSize(word32 inputSz, word32 blockSz)
+{
+	if (blockSz == 0)
+		return BAD_FUNC_ARG;
+
+	return (blockSz - (inputSz % blockSz));
+}
+
+/* pad input data to blockSz chunk, place in outSz. out must be big enough
+ * for input + pad bytes. See PKCS7_GetPadSize() helper. */
+int wc_PKCS7_PadData(const byte* in, word32 inSz, byte* out, word32 outSz, word32 blockSz)
+{
+	if (in == NULL || inSz == 0 ||
+		out == NULL || outSz == 0)
+		return BAD_FUNC_ARG;
+
+	const int padSz = wc_PKCS7_GetPadSize(inSz, blockSz);
+
+	if (outSz < (inSz + padSz))
+		return BAD_FUNC_ARG;
+
+	memcpy(out, in, inSz);
+
+	for (int i = 0; i < padSz; ++i)
+		out[inSz + i] = (byte)padSz;
+
+	return inSz + padSz;
+}
+#endif // !PKCS7
+
 namespace Crypto
 {
-	// those 2 funcs are taken from wolfssl, whole pkcs7 is too heavy
+	const size_t minPasswordLen = 10;
+	const size_t passwordBufSz = 63 + 1;
 
-	/* return size of padded data, padded to blockSz chunks, or negative on error */
-	constexpr int PKCS7_GetPadSize(word32 inputSz, word32 blockSz)
+	bool Encrypt(const char* password, word32 keySz, int pbkdfIterationCount, int pbkdfHashAlgo,
+		const byte* input, word32 inputSz,
+		byte* outSalt, word32 outSaltSz,
+		byte* outIV, word32 outIVSz,
+		byte* outAuthTag, word32 outAuthTagSz,
+		byte** out, word32* outSz)
 	{
-		if (blockSz == 0)
-			return BAD_FUNC_ARG;
-
-		return (blockSz - (inputSz % blockSz));
-	}
-
-	/* pad input data to blockSz chunk in place. in must be big enough
-	 * for content + pad bytes. inLen is data len, inSz is buffer size */
-	int PKCS7_PadData(byte* in, word32 inLen, word32 inSz, word32 blockSz)
-	{
-		if (in == nullptr || inLen == 0)
-			return BAD_FUNC_ARG;
-
-		int padSz = PKCS7_GetPadSize(inLen, blockSz);
-		if (padSz == BAD_FUNC_ARG)
-			return BAD_FUNC_ARG;
-
-		if (inSz < (inLen + padSz))
-			return BAD_FUNC_ARG;
-
-		for (int i = 0; i < padSz; ++i)
-			in[inLen + i] = (byte)padSz;
-
-		return inLen + padSz;
-	}
-
-	// output buffer must be AES_BLOCK_SIZE aligned
-	bool Encrypt(const byte* input, word32 inputLen,
-		const char* encryptPass, word32 keySize, int pbkdfIterationCount, int pbkdfHashAlgo,
-		byte* outSalt, word32 outSaltSize,
-		byte* outIV, word32 outIVSize,
-		byte* outAuthTag, word32 outAuthTagSize,
-		byte* output)
-	{
-		Log("Encrypting...");
+		Log(LogChannel::GENERAL, "Encrypting...");
 
 		WC_RNG rng;
 		if (wc_InitRng(&rng))
 		{
-			printf("rng init failed\n");
+			putsnn("RNG init failed\n");
 			return false;
 		}
 
-		bool rngFailed = (wc_RNG_GenerateBlock(&rng, outSalt, outSaltSize) || wc_RNG_GenerateBlock(&rng, outIV, outIVSize));
+		const bool rngFailed = (wc_RNG_GenerateBlock(&rng, outSalt, outSaltSz) || wc_RNG_GenerateBlock(&rng, outIV, outIVSz));
+
 		wc_FreeRng(&rng);
 
 		if (rngFailed)
 		{
-			printf("rng generation failed\n");
+			putsnn("RNG generation failed\n");
 			return false;
 		}
 
-		const int paddedInputSize = inputLen + PKCS7_GetPadSize(inputLen, AES_BLOCK_SIZE);
-
-		byte* paddedInput = (byte*)malloc(paddedInputSize);
-
-		byte* keyStretched = (byte*)malloc(keySize);
-
-		if (!paddedInput || !keyStretched)
+		byte* key = (byte*)malloc(keySz);
+		if (!key)
 		{
-			printf("allocation failed\n");
+			putsnn("key allocation failed\n");
 			return false;
 		}
-
-		memcpy(paddedInput, input, inputLen);
-		PKCS7_PadData(paddedInput, inputLen, paddedInputSize, AES_BLOCK_SIZE);
 
 		Aes aes;
 
-		if (wc_PBKDF2(keyStretched, (byte*)encryptPass, strlen(encryptPass), outSalt, outSaltSize, pbkdfIterationCount, keySize, pbkdfHashAlgo) ||
-			wc_AesGcmSetKey(&aes, keyStretched, keySize) ||
-			wc_AesGcmEncrypt(&aes, output, paddedInput, paddedInputSize, outIV, outIVSize, outAuthTag, outAuthTagSize, nullptr, 0))
-		{
-			free(paddedInput);
-			memset(keyStretched, 0, keySize);
-			free(keyStretched);
+		const bool stretchFailed =
+			(wc_PBKDF2(key, (byte*)password, strlen(password), outSalt, outSaltSz, pbkdfIterationCount, keySz, pbkdfHashAlgo) ||
+			wc_AesGcmSetKey(&aes, key, keySz));
 
-			printf("fail\n");
+		free(key);
+
+		if (stretchFailed)
+		{
+			putsnn("key stretching or setting failed\n");
 			return false;
 		}
 
-		free(paddedInput);
-		memset(keyStretched, 0, keySize);
-		free(keyStretched);
+		const word32 paddedSz = inputSz + wc_PKCS7_GetPadSize(inputSz, AES_BLOCK_SIZE);
+		byte* padded = (byte*)malloc(paddedSz);
+		if (!padded)
+		{
+			putsnn("padded input allocation failed\n");
+			return false;
+		}
 
-		printf("ok\n");
+		if (0 > wc_PKCS7_PadData(input, inputSz, padded, paddedSz, AES_BLOCK_SIZE))
+		{
+			free(padded);
+			putsnn("padding failed\n");
+			return false;
+		}
+
+		byte* encrypted = (byte*)malloc(paddedSz);
+		if (!encrypted)
+		{
+			free(padded);
+			putsnn("result allocation failed\n");
+			return false;
+		}
+
+		if (wc_AesGcmEncrypt(&aes, encrypted, padded, paddedSz, outIV, outIVSz, outAuthTag, outAuthTagSz, nullptr, 0))
+		{
+			free(padded);
+			free(encrypted);
+			putsnn("encryption failed\n");
+			return false;
+		}
+
+		free(padded);
+
+		*out = encrypted;
+		*outSz = paddedSz;
+
+		putsnn("ok\n");
 		return true;
 	}
 
-	// output buffer must be AES_BLOCK_SIZE aligned
-	bool Decrypt(const byte* input, size_t inputLen,
-		const char* decryptPass, word32 keySize, int pbkdfIterationCount, int pbkdfHashAlgo,
-		word32 saltSize,
-		word32 ivSize,
-		word32 authTagSize,
-		byte* output)
+	bool Decrypt(const char* password, word32 keySz, int pbkdfIterationCount, int pbkdfHashAlgo,
+		const byte* input, size_t inputSz,
+		const byte* salt, word32 saltSz,
+		const byte* iv, word32 ivSz,
+		const byte* authTag, word32 authTagSz,
+		byte** out, word32* outSz)
 	{
-		Log("Decrypting...");
+		Log(LogChannel::GENERAL, "Decrypting...");
 
-		const byte* salt = input;
-		const byte* iv = salt + saltSize;
-		const byte* authTag = iv + ivSize;
-		const byte* data = authTag + authTagSize;
-		const size_t dataSize = inputLen - (data - input);
+		byte* key = (byte*)malloc(keySz);
+		if (!key)
+		{
+			putsnn("key allocation failed\n");
+			return false;
+		}
 
 		Aes aes;
 
-		byte* keyStretched = (byte*)malloc(keySize);
-		if (!keyStretched)
+		const bool stretchFailed =
+			(wc_PBKDF2(key, (byte*)password, strlen(password), salt, saltSz, pbkdfIterationCount, keySz, pbkdfHashAlgo) ||
+			wc_AesGcmSetKey(&aes, key, keySz));
+
+		free(key);
+
+		if (stretchFailed)
 		{
-			printf("allocation failed\n");
+			putsnn("key stretching or setting failed\n");
 			return false;
 		}
 
-		if (wc_PBKDF2(keyStretched, (byte*)decryptPass, strlen(decryptPass), salt, saltSize, pbkdfIterationCount, keySize, pbkdfHashAlgo) ||
-			wc_AesGcmSetKey(&aes, keyStretched, keySize) ||
-			wc_AesGcmDecrypt(&aes, output, data, dataSize, iv, ivSize, authTag, authTagSize, nullptr, 0))
+		byte* plaintext = (byte*)malloc(inputSz);
+		if (!plaintext)
 		{
-			memset(keyStretched, 0, keySize);
-			free(keyStretched);
-
-			printf("fail\n");
+			putsnn("plaintext allocation failed\n");
 			return false;
 		}
 
-		memset(keyStretched, 0, keySize);
-		free(keyStretched);
+		if (wc_AesGcmDecrypt(&aes, plaintext, input, inputSz, iv, ivSz, authTag, authTagSz, nullptr, 0))
+		{
+			free(plaintext);
+			putsnn("wrong password or decryption failed\n");
+			return false;
+		}
 
-		printf("ok\n");
+		*out = plaintext;
+		*outSz = inputSz - plaintext[inputSz - 1];
+
+		putsnn("ok\n");
 		return true;
 	}
 }
