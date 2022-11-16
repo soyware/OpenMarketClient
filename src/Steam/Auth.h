@@ -20,13 +20,14 @@ namespace Steam
 		enum class LoginResult
 		{
 			OK,
+			GET_ENCRYPT_KEY_FAILED,
 			PASS_ENCRYPT_FAILED,
 			CAPTCHA_FAILED,
 			REQUEST_FAILED,
 			WRONG_CAPTCHA,
 			WRONG_TWO_FACTOR,
 			UNSUCCEDED,
-			OAUTH_PARSE_FAILED,
+			OAUTH_FAILED,
 		};
 
 		// outHexModulus buffer size must be at least modulusSz * 2
@@ -138,7 +139,7 @@ namespace Steam
 			if (!GetPasswordRSAPublicKey(curl, escUsername, rsaHexModulus, rsaHexExponent, rsaTimestamp))
 			{
 				curl_free(escUsername);
-				return LoginResult::PASS_ENCRYPT_FAILED;
+				return LoginResult::GET_ENCRYPT_KEY_FAILED;
 			}
 
 			Log(LogChannel::STEAM, "Decoding password RSA public key...");
@@ -269,8 +270,12 @@ namespace Steam
 				const auto iterMessage = parsed.FindMember("message");
 				if (iterMessage != parsed.MemberEnd())
 				{
-					printf("response message: %s\n", iterMessage->value.GetString());
-					return LoginResult::UNSUCCEDED;
+					const char* msg = iterMessage->value.GetString();
+					if (msg[0])
+					{
+						putsnn(msg);
+						return LoginResult::UNSUCCEDED;
+					}
 				}
 
 				putsnn("request unsucceeded\n");
@@ -281,7 +286,7 @@ namespace Steam
 			if (iterOAuth == parsed.MemberEnd())
 			{
 				putsnn("OAuth not found\n");
-				return LoginResult::OAUTH_PARSE_FAILED;
+				return LoginResult::OAUTH_FAILED;
 			}
 
 			rapidjson::Document parsedOAuth;
@@ -290,7 +295,7 @@ namespace Steam
 			if (parsedOAuth.HasParseError())
 			{
 				putsnn("JSON parsing failed\n");
-				return LoginResult::OAUTH_PARSE_FAILED;
+				return LoginResult::OAUTH_FAILED;
 			}
 
 			const char* steamId64 = parsedOAuth["steamid"].GetString();
@@ -306,7 +311,7 @@ namespace Steam
 		}
 
 		// outLoginToken buffer size must be at least loginTokenBufSz
-		bool RefreshOAuthSession(CURL* curl, const char* oauthToken, char* outLoginToken)
+		int RefreshOAuthSession(CURL* curl, const char* oauthToken, char* outLoginToken)
 		{
 			const char postFieldAccessToken[] = "access_token=";
 
@@ -327,9 +332,20 @@ namespace Steam
 
 			if (respCode != CURLE_OK)
 			{
+				if (respCode == CURLE_HTTP_RETURNED_ERROR)
+				{
+					long httpCode;
+					curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &httpCode);
+					if (httpCode == 401) // unauthorized
+					{
+						Log(LogChannel::STEAM, "Refreshing OAuth session failed: OAuth token is invalid or has expired\n");
+						return 0;
+					}
+				}
+
 				Log(LogChannel::STEAM, "Refreshing OAuth session failed: ");
 				Curl::PrintError(curl, respCode);
-				return false;
+				return -1;
 			}
 
 			rapidjson::Document parsed;
@@ -338,21 +354,21 @@ namespace Steam
 			if (parsed.HasParseError())
 			{
 				Log(LogChannel::STEAM, "Refreshing OAuth session failed: JSON parsing failed\n");
-				return false;
+				return -1;
 			}
 
 			const auto iterResponse = parsed.FindMember("response");
 			if (iterResponse == parsed.MemberEnd() || iterResponse->value.ObjectEmpty())
 			{
 				Log(LogChannel::STEAM, "Refreshing OAuth session failed: request unsucceeded\n");
-				return false;
+				return -1;
 			}
 
 			const char* loginToken = iterResponse->value["token_secure"].GetString();
 
 			strcpy(outLoginToken, loginToken);
 
-			return true;
+			return 1;
 		}
 
 		// unused JWT stuff below

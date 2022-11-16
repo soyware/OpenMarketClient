@@ -86,14 +86,14 @@ namespace Steam
 
 		if (wc_InitRng(&rng))
 		{
-			Log(LogChannel::STEAM, "Generating session ID failed: RNG init failed\n");
+			Log(LogChannel::STEAM, "Session ID generation failed: RNG init failed\n");
 			return false;
 		}
 
 		if (wc_RNG_GenerateBlock(&rng, rawSessionId, sizeof(rawSessionId)))
 		{
 			wc_FreeRng(&rng);
-			Log(LogChannel::STEAM, "Generating session ID failed: RNG generation failed\n");
+			Log(LogChannel::STEAM, "Session ID generation failed: RNG generation failed\n");
 			return false;
 		}
 
@@ -103,7 +103,7 @@ namespace Steam
 
 		if (Base16_Encode(rawSessionId, sizeof(rawSessionId), (byte*)out, &sessionIdSz))
 		{
-			Log(LogChannel::STEAM, "Generating session ID failed: encoding failed\n");
+			Log(LogChannel::STEAM, "Session ID generation failed: encoding failed\n");
 			return false;
 		}
 
@@ -128,7 +128,7 @@ namespace Steam
 		cookieSessionEnd = stpcpy(cookieSessionEnd, cookieSessionStart);
 		strcpy(cookieSessionEnd, sessionId);
 
-		if (curl_easy_setopt(curl, CURLOPT_COOKIELIST, cookieSession))
+		if (curl_easy_setopt(curl, CURLOPT_COOKIELIST, cookieSession) != CURLE_OK)
 		{
 			Log(LogChannel::STEAM, "Setting session ID cookie failed\n");
 			return false;
@@ -157,7 +157,7 @@ namespace Steam
 		cookieLoginEnd = stpcpy(cookieLoginEnd, "%7C%7C");
 		strcpy(cookieLoginEnd, loginToken);
 
-		if (curl_easy_setopt(curl, CURLOPT_COOKIELIST, cookieLogin))
+		if (curl_easy_setopt(curl, CURLOPT_COOKIELIST, cookieLogin) != CURLE_OK)
 		{
 			Log(LogChannel::STEAM, "Setting login cookie failed\n");
 			return false;
@@ -188,7 +188,7 @@ namespace Steam
 		cookieRefreshEnd = stpcpy(cookieRefreshEnd, "%7C%7C");
 		strcpy(cookieRefreshEnd, refreshToken);
 
-		if (curl_easy_setopt(curl, CURLOPT_COOKIELIST, cookieRefresh))
+		if (curl_easy_setopt(curl, CURLOPT_COOKIELIST, cookieRefresh) != CURLE_OK)
 		{
 			putsnn("fail\n");
 			return false;
@@ -311,7 +311,7 @@ namespace Steam
 
 		if (!privacySettings.Accept(privacySettingsWriter))
 		{
-			putsnn("JSON privacy settings to string failed\n");
+			putsnn("converting privacy settings JSON to string failed\n");
 			return false;
 		}
 
@@ -329,15 +329,13 @@ namespace Steam
 
 		newCommentPerm = (newCommentPerm + 1) % 3; // convert back
 
-		const std::string strNewCommentPerm(std::to_string(newCommentPerm));
-
 		postFieldsEnd = postFields;
 		postFieldsEnd = stpcpy(postFieldsEnd, postFieldSession);
 		postFieldsEnd = stpcpy(postFieldsEnd, sessionId);
 		postFieldsEnd = stpcpy(postFieldsEnd, postFieldPrivacy);
 		postFieldsEnd = stpcpy(postFieldsEnd, privacySettingsStrBuf.GetString());
 		postFieldsEnd = stpcpy(postFieldsEnd, postFieldCommentPerm);
-		strcpy(postFieldsEnd, strNewCommentPerm.c_str());
+		strcpy(postFieldsEnd, std::to_string(newCommentPerm).c_str());
 
 		Curl::CResponse respSet;
 		curl_easy_setopt(curl, CURLOPT_WRITEDATA, &respSet);

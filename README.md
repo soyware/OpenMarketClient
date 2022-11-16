@@ -1,5 +1,5 @@
 # OpenMarketClient
-Unofficial open-source cross-platform console client for:
+Unofficial cross-platform console client for:
 * [market.csgo.com](https://market.csgo.com)
 * [market.dota2.net](https://market.dota2.net)
 * [tf2.tm](https://tf2.tm)

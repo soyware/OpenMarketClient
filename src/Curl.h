@@ -114,11 +114,9 @@ namespace Curl
 
 	CURL* Init(const char* proxy)
 	{
-		Log(LogChannel::LIBCURL, "Initializing...");
-
 		if (curl_global_init(CURL_GLOBAL_ALL))
 		{
-			putsnn("global init failed\n");
+			Log(LogChannel::LIBCURL, "Global init failed\n");
 			return nullptr;
 		}
 
@@ -126,7 +124,7 @@ namespace Curl
 		if (!curl)
 		{
 			curl_global_cleanup();
-			putsnn("easy session init failed\n");
+			Log(LogChannel::LIBCURL, "Easy session init failed\n");
 			return nullptr;
 		}
 
@@ -135,9 +133,7 @@ namespace Curl
 		curl_easy_setopt(curl, CURLOPT_FAILONERROR, 1L);
 		curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
 
-		putsnn("ok\n");
-
-		if (proxy)
+		if (proxy && proxy[0])
 		{
 			Log(LogChannel::LIBCURL, "Setting a proxy...");
 

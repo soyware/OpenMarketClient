@@ -63,9 +63,6 @@ int wc_PKCS7_PadData(const byte* in, word32 inSz, byte* out, word32 outSz, word3
 
 namespace Crypto
 {
-	const size_t minPasswordLen = 10;
-	const size_t passwordBufSz = 63 + 1;
-
 	bool Encrypt(const char* password, word32 keySz, int pbkdfIterationCount, int pbkdfHashAlgo,
 		const byte* input, word32 inputSz,
 		byte* outSalt, word32 outSaltSz,
@@ -109,7 +106,7 @@ namespace Crypto
 
 		if (stretchFailed)
 		{
-			putsnn("key stretching or setting failed\n");
+			putsnn("key stretching or setting AES key failed\n");
 			return false;
 		}
 
@@ -179,7 +176,7 @@ namespace Crypto
 
 		if (stretchFailed)
 		{
-			putsnn("key stretching or setting failed\n");
+			putsnn("key stretching or setting AES key failed\n");
 			return false;
 		}
 

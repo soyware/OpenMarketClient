@@ -233,7 +233,7 @@ namespace Steam
 			}
 
 			const auto iterOfferId = parsed.FindMember("tradeofferid");
-			if ((iterOfferId == parsed.MemberEnd()) || strcmp(iterOfferId->value.GetString(), offerId))
+			if (iterOfferId == parsed.MemberEnd())
 			{
 				putsnn("request unsucceeded\n");
 				return false;
@@ -244,7 +244,7 @@ namespace Steam
 		}
 
 		bool GetOffers(CURL* curl, const char* apiKey, bool getSent, bool getReceived, bool getDescriptions, 
-			bool activeOnly, bool historicalOnly, const char* language, uint32_t timeHistoricalCutoff,
+			bool activeOnly, bool historicalOnly, const char* language, uint64_t timeHistoricalCutoff,
 			uint32_t cursor, rapidjson::Document* outDoc)
 		{
 			//Log(LogChannel::STEAM, "Getting trade offers...");

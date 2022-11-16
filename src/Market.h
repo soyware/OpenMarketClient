@@ -3,7 +3,7 @@
 namespace Market
 {
 	const size_t apiKeySz = 31;
-	const auto pingInterval = 2min;
+	const size_t hashBufSz = 50;
 	const int offerTTL = (15 * 60);
 
 	enum class Market
@@ -57,19 +57,13 @@ namespace Market
 		WAITING_ACCEPT
 	};
 	
-	enum Status
-	{
-		SOLD = (1 << 0),
-		BOUGHT = (1 << 1),
-	};
-
 	void RateLimit()
 	{
 		static std::chrono::high_resolution_clock::time_point nextRequestTime;
 		std::this_thread::sleep_until(nextRequestTime);
 
 		const auto curTime = std::chrono::high_resolution_clock::now();
-		const auto requestInterval = 2s;
+		const auto requestInterval = 1s;
 		nextRequestTime = curTime + requestInterval;
 	}
 
@@ -133,7 +127,7 @@ namespace Market
 	// outPartnerId64 buffer size must be at least UINT64_MAX_STR_SIZE
 	bool RequestTake(CURL* curl, const char* apiKey, int market, char* outOfferId, char* outPartnerId64)
 	{
-		Log(LogChannel::MARKET, "Requesting details to receive items...");
+		Log(LogChannel::MARKET, "[%s] Requesting details to receive items...", marketNames[market]);
 
 		const char query[] = "trade-request-take?key=";
 
@@ -183,19 +177,75 @@ namespace Market
 		return true;
 	}
 
-	bool RequestGive(CURL* curl, const char* apiKey, int market, rapidjson::Document* outDoc)
+	bool RequestGiveBot(CURL* curl, const char* apiKey, int market, char* outTradeOfferId, char* outPartnerId64)
 	{
-		Log(LogChannel::MARKET, "Requesting details to send items...");
+		Log(LogChannel::MARKET, "[%s] Requesting details to send items...", marketNames[market]);
 
 		const char query[] = "trade-request-give?key=";
-		const char queryP2P[] = "trade-request-give-p2p-all?key=";
 
-		const size_t urlBufSz = marketBaseUrlMaxSz - 1 + sizeof(queryP2P) - 1 + apiKeySz + 1;
+		const size_t urlBufSz = marketBaseUrlMaxSz - 1 + sizeof(query) - 1 + apiKeySz + 1;
 		char url[urlBufSz];
 
 		char* urlEnd = url;
 		urlEnd = stpcpy(urlEnd, marketBaseUrls[market]);
-		urlEnd = stpcpy(urlEnd, (isMarketP2P[market] ? queryP2P : query));
+		urlEnd = stpcpy(urlEnd, query);
+		strcpy(urlEnd, apiKey);
+
+		Curl::CResponse response;
+		curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
+		curl_easy_setopt(curl, CURLOPT_URL, url);
+		curl_easy_setopt(curl, CURLOPT_HTTPGET, 1L);
+
+		const CURLcode respCode = curl_easy_perform(curl);
+
+		if (respCode != CURLE_OK)
+		{
+			Curl::PrintError(curl, respCode);
+			return false;
+		}
+
+		rapidjson::Document parsed;
+		parsed.ParseInsitu(response.data);
+
+		if (parsed.HasParseError())
+		{
+			putsnn("JSON parsing failed\n");
+			return false;
+		}
+
+		if (!parsed["success"].GetBool())
+		{
+			const auto iterError = parsed.FindMember("error");
+			if (iterError != parsed.MemberEnd() && !strcmp(iterError->value.GetString(), "nothing"))
+				putsnn("nothing\n");
+			else
+				putsnn("request unsucceeded\n");
+
+			return false;
+		}
+
+		const char* offerId = parsed["trade"].GetString();
+		const char* profile = parsed["profile"].GetString();
+
+		strcpy(outTradeOfferId, offerId);
+		stpncpy(outPartnerId64, profile + 36, strlen(profile + 36) - 1)[0] = '\0';
+
+		putsnn("ok\n");
+		return true;
+	}
+
+	bool RequestGiveP2PAll(CURL* curl, const char* apiKey, int market, rapidjson::Document* outDoc)
+	{
+		Log(LogChannel::MARKET, "[%s] Requesting details to send items...", marketNames[market]);
+
+		const char query[] = "trade-request-give-p2p-all?key=";
+
+		const size_t urlBufSz = marketBaseUrlMaxSz - 1 + sizeof(query) - 1 + apiKeySz + 1;
+		char url[urlBufSz];
+
+		char* urlEnd = url;
+		urlEnd = stpcpy(urlEnd, marketBaseUrls[market]);
+		urlEnd = stpcpy(urlEnd, query);
 		strcpy(urlEnd, apiKey);
 
 		Curl::CResponse response;
@@ -281,21 +331,33 @@ namespace Market
 
 	bool CanSell(CURL* curl, const char* apiKey)
 	{
-		rapidjson::Document parsed;
-		if (!GetProfileStatus(curl, apiKey, &parsed))
+		rapidjson::Document docTest;
+		if (!GetProfileStatus(curl, apiKey, &docTest))
 			return false;
 
-		const rapidjson::Value& status = parsed["status"];
+		const rapidjson::Value& status = docTest["status"];
 
-		const bool canSell = 
-			(status["steam_web_api_key"].GetBool() &&
-			status["user_token"].GetBool() &&
-			status["trade_check"].GetBool() &&
-			status["site_notmpban"].GetBool());
-
-		if (!canSell)
+		if (!status["steam_web_api_key"].GetBool())
 		{
-			Log(LogChannel::MARKET, "Can't sell on the market\n");
+			Log(LogChannel::MARKET, "Can't sell on the market: Steam web API key not set\n");
+			return false;
+		}
+
+		if (!status["user_token"].GetBool())
+		{
+			Log(LogChannel::MARKET, "Can't sell on the market: Steam trade token not set\n");
+			return false;
+		}
+
+		if (!status["trade_check"].GetBool())
+		{
+			Log(LogChannel::MARKET, "Can't sell on the market: trade check required - https://market.csgo.com/check\n");
+			return false;
+		}
+
+		if (!status["site_notmpban"].GetBool())
+		{
+			Log(LogChannel::MARKET, "Can't sell on the market: banned\n");
 			return false;
 		}
 
@@ -411,12 +473,25 @@ namespace Market
 	// steam login token must be set when calling this
 	bool SetSteamDetails(CURL* curl, const char* apiKey, const char* steamApiKey)
 	{
-		char tradeToken[Steam::Trade::tokenBufSz];
-		if (!Steam::Trade::GetToken(curl, tradeToken) || !SetSteamTradeToken(curl, apiKey, tradeToken))
+		rapidjson::Document docTest;
+		if (!GetProfileStatus(curl, apiKey, &docTest))
 			return false;
 
-		if (!SetSteamApiKey(curl, apiKey, steamApiKey))
-			return false;
+		const rapidjson::Value& status = docTest["status"];
+
+		if (!status["steam_web_api_key"].GetBool())
+		{
+			// this fails on the first try sometimes, don't know why
+			if (!SetSteamApiKey(curl, apiKey, steamApiKey) && !SetSteamApiKey(curl, apiKey, steamApiKey))
+				return false;
+		}
+
+		if (!status["user_token"].GetBool())
+		{
+			char tradeToken[Steam::Trade::tokenBufSz];
+			if (!Steam::Trade::GetToken(curl, tradeToken) || !SetSteamTradeToken(curl, apiKey, tradeToken))
+				return false;
+		}
 
 		return true;
 	}
@@ -424,7 +499,7 @@ namespace Market
 	// unused
 	bool GoOffline(CURL* curl, const char* apiKey)
 	{
-		Log(LogChannel::MARKET, "Going offline on the market...");
+		Log(LogChannel::MARKET, "Going offline...");
 
 		const char query[] = "go-offline?key=";
 

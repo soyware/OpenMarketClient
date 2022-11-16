@@ -289,15 +289,90 @@ namespace Steam
 			return true;
 		}
 
-		bool AcceptConfirmations(CURL* curl, 
-			const char* steamId64, const char* identitySecret, const char* deviceId, 
-			const std::string* offerIds, size_t offerIdCount)
+		bool AcceptConfirmation(CURL* curl, 
+			const char* steamId64, const char* identitySecret, const char* deviceId, const char* offerId)
 		{
 			Curl::CResponse respConfs;
 			if (1 != FetchConfirmations(curl, steamId64, identitySecret, deviceId, &respConfs))
 				return false;
 
-			Log(LogChannel::STEAM, "Accepting trade offer confirmations...");
+			Log(LogChannel::STEAM, "Accepting confirmation...");
+
+			const char cId[] = "&op=allow&cid=";
+			const char cK[] = "&ck=";
+
+			const size_t postFieldsBufSz = 
+				confQueueParamsBufSz - 1 + 
+				sizeof(cId) - 1 + confIdBufSz - 1 +
+				sizeof(cK) - 1 + confKeyBufSz - 1 + 1;
+
+			char postFields[postFieldsBufSz];
+
+			if (!GenerateConfirmationQueryParams(curl, steamId64, identitySecret, deviceId, "allow", postFields))
+			{
+				putsnn("query params generation failed\n");
+				return false;
+			}
+
+			const char* confId;
+			const char* confKey;
+
+			if (!FindConfirmationParams(respConfs.data, offerId, &confId, &confKey))
+				return false;
+
+			char* postFieldsEnd = postFields + strlen(postFields);
+			postFieldsEnd = stpcpy(postFieldsEnd, cId);
+			postFieldsEnd = stpncpy(postFieldsEnd, confId, (strchr(confId, '\"') - confId));
+			postFieldsEnd = stpcpy(postFieldsEnd, cK);
+			postFieldsEnd = stpncpy(postFieldsEnd, confKey, (strchr(confKey, '\"') - confKey));
+			postFieldsEnd[0] = '\0';
+
+			// respConfs isn't used anymore so empty it
+			respConfs.Empty();
+
+			Curl::CResponse respOp;
+			curl_easy_setopt(curl, CURLOPT_WRITEDATA, &respOp);
+			curl_easy_setopt(curl, CURLOPT_URL, "https://steamcommunity.com/mobileconf/ajaxop");
+			curl_easy_setopt(curl, CURLOPT_POST, 1L);
+			curl_easy_setopt(curl, CURLOPT_POSTFIELDS, postFields);
+
+			const CURLcode respCodeOp = curl_easy_perform(curl);
+
+			if (respCodeOp != CURLE_OK)
+			{
+				Curl::PrintError(curl, respCodeOp);
+				return false;
+			}
+
+			rapidjson::Document parsedOp;
+			parsedOp.ParseInsitu(respOp.data);
+
+			if (parsedOp.HasParseError())
+			{
+				putsnn("JSON parsing failed\n");
+				return false;
+			}
+
+			if (!parsedOp["success"].GetBool())
+			{
+				putsnn("request unsucceeded\n");
+				return false;
+			}
+
+			putsnn("ok\n");
+			return true;
+		}
+
+		// unused
+		bool AcceptConfirmations(CURL* curl, 
+			const char* steamId64, const char* identitySecret, const char* deviceId, 
+			const char** offerIds, size_t offerIdCount)
+		{
+			Curl::CResponse respConfs;
+			if (1 != FetchConfirmations(curl, steamId64, identitySecret, deviceId, &respConfs))
+				return false;
+
+			Log(LogChannel::STEAM, "Accepting confirmations...");
 
 			const char opAllow[] = "&op=allow";
 
@@ -325,15 +400,15 @@ namespace Steam
 
 			for (size_t i = 0; i < offerIdCount; ++i)
 			{
-				const char* id;
-				const char* key;
-				if (!FindConfirmationParams(respConfs.data, offerIds[i].c_str(), &id, &key))
+				const char* confId;
+				const char* confKey;
+				if (!FindConfirmationParams(respConfs.data, offerIds[i], &confId, &confKey))
 					continue;
 
 				postFieldsEnd = stpcpy(postFieldsEnd, "&cid[]=");
-				postFieldsEnd = stpncpy(postFieldsEnd, id, (strchr(id, '\"') - id));
+				postFieldsEnd = stpncpy(postFieldsEnd, confId, (strchr(confId, '\"') - confId));
 				postFieldsEnd = stpcpy(postFieldsEnd, "&ck[]=");
-				postFieldsEnd = stpncpy(postFieldsEnd, key, (strchr(key, '\"') - key));
+				postFieldsEnd = stpncpy(postFieldsEnd, confKey, (strchr(confKey, '\"') - confKey));
 
 				++confirmedCount;
 			}

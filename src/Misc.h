@@ -296,28 +296,20 @@ const char* GetExeDir()
 void Pause()
 {
 #ifdef _WIN32
-	// is stdout a terminal
-#pragma warning (suppress:4996)
-	if (!isatty(fileno(stdout)))
+	// check if stdout isn't a terminal
+	if (!_isatty(_fileno(stdout)))
 		return;
 
 	FlashCurrentWindow();
 
-	// is run from cmd
+	// check if run by doubleclicking the executable
 	if (getenv("PROMPT"))
 		return;
 
-	putsnn("Press Enter to continue...");
+	putsnn("Press Enter to continue\n");
 
-#ifdef _WIN32
 	wint_t c;
 	while ((c = getwchar()) != L'\n' && c != WEOF);
-#else
-	// if the byte is a part of UTF-8 char it would have 8th bit set
-	// therefore we can't accidentally find newline
-	int c;
-	while ((c = getchar()) != '\n' && c != EOF);
-#endif // _WIN32
 
 #endif // _WIN32
 }
@@ -360,12 +352,12 @@ inline uint64_t byteswap64(uint64_t qw)
 	return *((uint64_t*)&res);
 }
 
+// unused
 void ClearConsole()
 {
 #ifdef _WIN32
 	// is stdout a terminal
-#pragma warning (suppress:4996)
-	if (!isatty(fileno(stdout)))
+	if (!_isatty(_fileno(stdout)))
 		return;
 
 	const HANDLE hStdout = GetStdHandle(STD_OUTPUT_HANDLE);
