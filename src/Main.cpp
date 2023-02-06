@@ -6,7 +6,7 @@
 #include "Market.h"
 #include "Account.h"
 
-#define OPENMARKETCLIENT_VERSION "0.3.1"
+#define OPENMARKETCLIENT_VERSION "0.3.2"
 
 /*	
 * TODO:
@@ -87,7 +87,7 @@ bool SetWorkDirToExeDir()
 
 void InitSavedAccounts(CURL* curl, const char* sessionId, const char* encryptPass, std::vector<CAccount>* accounts)
 {
-	const std::filesystem::path dir(CAccount::dirName);
+	const std::filesystem::path dir(CAccount::directory);
 
 	if (!std::filesystem::exists(dir))
 		return;

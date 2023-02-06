@@ -46,41 +46,40 @@ public:
 	std::vector<std::string>	takenOfferIds[(int)Market::Market::COUNT];
 
 
-	static constexpr const char	dirName[] = "accounts";
+	static constexpr const char	directory[] = "accounts";
 	static constexpr const char	extension[] = ".bin";
 
-	static constexpr int		pbkdfIterationCount = 1000000;
-	static constexpr int		pbkdfHashAlgo = WC_SHA256;
-	static constexpr size_t		pbkdfSaltSz = (128 / 8);	// NIST recommends at least 128 bits
+	static constexpr int		scryptCost = 16;			// (128 * (2^16) * 8) = 64 MB RAM
+	static constexpr int		scryptBlockSz = 8;
+	static constexpr int		scryptParallel = 1;
 
 	static constexpr size_t		keySz = AES_256_KEY_SIZE;
+	static constexpr size_t		saltSz = (128 / 8);			// NIST recommends at least 128 bits
 	static constexpr size_t		ivSz = GCM_NONCE_MID_SZ;
 	static constexpr size_t		authTagSz = (128 / 8);		// max allowed tag size is 128 bits
 
 
 	bool Save(const char* encryptPass)
 	{
-		byte salt[pbkdfSaltSz];
+		byte salt[saltSz];
 		byte iv[ivSz];
 		byte authTag[authTagSz];
-
-		byte* encrypted = nullptr;
-		word32 encryptedSz = 0;
+		byte cipher[ACCOUNT_SAVED_FIELDS_SZ];
 
 		const bool encryptFailed = 
-			!Crypto::Encrypt(encryptPass, keySz, pbkdfIterationCount, pbkdfHashAlgo, 
+			!Crypto::Encrypt(encryptPass, keySz, scryptCost, scryptBlockSz, scryptParallel,
 				(byte*)this, ACCOUNT_SAVED_FIELDS_SZ,
-				salt, pbkdfSaltSz,
+				salt, saltSz,
 				iv, ivSz, 
 				authTag, authTagSz,
-				&encrypted, &encryptedSz);
+				cipher);
 
 		if (encryptFailed)
 			return false;
 
 		Log(LogChannel::GENERAL, "[%s] Saving...", name);
 
-		const std::filesystem::path dir(dirName);
+		const std::filesystem::path dir(directory);
 
 		if (!std::filesystem::exists(dir) && !std::filesystem::create_directory(dir))
 		{
@@ -91,7 +90,7 @@ public:
 		char path[PATH_MAX];
 
 		char* pathEnd = path;
-		pathEnd = stpcpy(pathEnd, dirName);
+		pathEnd = stpcpy(pathEnd, directory);
 		pathEnd = stpcpy(pathEnd, "/");
 		pathEnd = stpcpy(pathEnd, name);
 		strcpy(pathEnd, extension);
@@ -104,12 +103,11 @@ public:
 		}
 
 		const bool writeFailed = 
-			((fwrite(salt, sizeof(byte), pbkdfSaltSz, file)		!= pbkdfSaltSz) ||
-			(fwrite(iv, sizeof(byte), ivSz, file)				!= ivSz) ||
-			(fwrite(authTag, sizeof(byte), authTagSz, file)		!= authTagSz) ||
-			(fwrite(encrypted, sizeof(byte), encryptedSz, file) != encryptedSz));
+			((fwrite(salt, sizeof(byte), sizeof(salt), file)		!= sizeof(salt)) ||
+			(fwrite(iv, sizeof(byte), sizeof(iv), file)				!= sizeof(iv)) ||
+			(fwrite(authTag, sizeof(byte), sizeof(authTag), file)	!= sizeof(authTag)) ||
+			(fwrite(cipher, sizeof(byte), sizeof(cipher), file)		!= sizeof(cipher)));
 
-		free(encrypted);
 		fclose(file);
 
 		if (writeFailed)
@@ -137,40 +135,22 @@ public:
 		putsnn("ok\n");
 
 		const byte* salt = contents;
-		const byte* iv = salt + pbkdfSaltSz;
+		const byte* iv = salt + saltSz;
 		const byte* authTag = iv + ivSz;
-		const byte* data = authTag + authTagSz;
-		const size_t dataSz = contentsSz - (data - contents);
-
-		byte* plaintext = nullptr;
-		word32 plaintextSz = 0;
+		const byte* cipher = authTag + authTagSz;
 
 		const bool decryptFailed = 
-			!Crypto::Decrypt(decryptPass, keySz, pbkdfIterationCount, pbkdfHashAlgo,
-				data, dataSz,
-				salt, pbkdfSaltSz,
+			!Crypto::Decrypt(decryptPass, keySz, scryptCost, scryptBlockSz, scryptParallel,
+				cipher, ACCOUNT_SAVED_FIELDS_SZ,
+				salt, saltSz,
 				iv, ivSz,
 				authTag, authTagSz,
-				&plaintext, &plaintextSz);
+				(byte*)this);
 
 		free(contents);
 
 		if (decryptFailed)
 			return false;
-
-		const bool compatible = (plaintextSz == ACCOUNT_SAVED_FIELDS_SZ);
-
-		if (compatible)
-			memcpy(this, plaintext, plaintextSz);
-
-		memset(plaintext, 0, plaintextSz);
-		free(plaintext);
-
-		if (!compatible)
-		{
-			Log(LogChannel::GENERAL, "[%s] Incompatible config\n", name);
-			return false;
-		}
 
 		return true;
 	}
