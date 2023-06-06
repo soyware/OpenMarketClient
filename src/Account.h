@@ -241,8 +241,8 @@ public:
 		return true;
 	}
 
-	bool Init(CURL* curl, const char* sessionId, 
-		const char* encryptPass, const char* name_ = nullptr, const char* path = nullptr, bool isMaFile = false)
+	bool Init(CURL* curl, const char* sessionId, const char* encryptPass, 
+		const char* name_ = nullptr, const char* path = nullptr, bool isMaFile = false)
 	{
 		char username[Steam::Auth::usernameBufSz] = "";
 		char sharedSecret[Steam::Guard::secretsSz + 1] = "";

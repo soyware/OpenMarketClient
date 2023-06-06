@@ -328,31 +328,30 @@ inline uint32_t byteswap32(uint32_t dw)
 {
 	uint32_t res;
 
-	res = *((uint32_t*)&dw) >> 24;
-	res |= ((*((uint32_t*)&dw) & 0x00FF0000) >> 8);
-	res |= ((*((uint32_t*)&dw) & 0x0000FF00) << 8);
-	res |= ((*((uint32_t*)&dw) & 0x000000FF) << 24);
+	res = dw >> 24;
+	res |= ((dw & 0x00FF0000) >> 8);
+	res |= ((dw & 0x0000FF00) << 8);
+	res |= ((dw & 0x000000FF) << 24);
 
-	return *((uint32_t*)&res);
+	return res;
 }
 
 inline uint64_t byteswap64(uint64_t qw)
 {
 	uint64_t res;
 
-	res = *((uint64_t*)&qw) >> 56;
-	res |= ((*((uint64_t*)&qw) & 0x00FF000000000000ull) >> 40);
-	res |= ((*((uint64_t*)&qw) & 0x0000FF0000000000ull) >> 24);
-	res |= ((*((uint64_t*)&qw) & 0x000000FF00000000ull) >> 8);
-	res |= ((*((uint64_t*)&qw) & 0x00000000FF000000ull) << 8);
-	res |= ((*((uint64_t*)&qw) & 0x0000000000FF0000ull) << 24);
-	res |= ((*((uint64_t*)&qw) & 0x000000000000FF00ull) << 40);
-	res |= ((*((uint64_t*)&qw) & 0x00000000000000FFull) << 56);
+	res = qw >> 56;
+	res |= ((qw & 0x00FF000000000000ull) >> 40);
+	res |= ((qw & 0x0000FF0000000000ull) >> 24);
+	res |= ((qw & 0x000000FF00000000ull) >> 8);
+	res |= ((qw & 0x00000000FF000000ull) << 8);
+	res |= ((qw & 0x0000000000FF0000ull) << 24);
+	res |= ((qw & 0x000000000000FF00ull) << 40);
+	res |= ((qw & 0x00000000000000FFull) << 56);
 
-	return *((uint64_t*)&res);
+	return res;
 }
 
-// unused
 void ClearConsole()
 {
 #ifdef _WIN32

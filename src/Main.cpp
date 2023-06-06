@@ -85,12 +85,14 @@ bool SetWorkDirToExeDir()
 #endif // _WIN32
 }
 
-void InitSavedAccounts(CURL* curl, const char* sessionId, const char* encryptPass, std::vector<CAccount>* accounts)
+bool InitSavedAccounts(CURL* curl, const char* sessionId, const char* encryptPass, std::vector<CAccount>* accounts)
 {
 	const std::filesystem::path dir(CAccount::directory);
 
 	if (!std::filesystem::exists(dir))
-		return;
+		return true;
+
+	bool success = true;
 
 	for (const auto& entry : std::filesystem::directory_iterator(dir))
 	{
@@ -114,8 +116,9 @@ void InitSavedAccounts(CURL* curl, const char* sessionId, const char* encryptPas
 		if (!WideCharToMultiByte(CP_UTF8, 0, widePath, -1, szPath, sizeof(szPath), NULL, NULL) ||
 			!WideCharToMultiByte(CP_UTF8, 0, wideFilenameNoExt, -1, szFilenameNoExt, sizeof(szFilenameNoExt), NULL, NULL))
 		{
-			Log(LogChannel::GENERAL, "One of the account's filename UTF-16 to UTF-8 mapping failed, skipping\n");
-			continue;
+			Log(LogChannel::GENERAL, "One of the account's filename UTF-16 to UTF-8 mapping failed\n");
+			success = false;
+			break;
 		}
 
 #else
@@ -127,12 +130,14 @@ void InitSavedAccounts(CURL* curl, const char* sessionId, const char* encryptPas
 
 		if (!account.Init(curl, sessionId, encryptPass, szFilenameNoExt, szPath, isMaFile))
 		{
-			Log(LogChannel::GENERAL, "Skipping \"%s\"\n", szFilenameNoExt);
-			continue;
+			success = false;
+			break;
 		}
 
 		accounts->emplace_back(account);
 	}
+
+	return success;
 }
 
 int main(int argc, char** argv)
@@ -202,7 +207,13 @@ int main(int argc, char** argv)
 		accounts.emplace_back(account);
 	}
 
-	InitSavedAccounts(curl, sessionId, encryptPass, &accounts);
+	if (!InitSavedAccounts(curl, sessionId, encryptPass, &accounts))
+	{
+		curl_easy_cleanup(curl);
+		curl_global_cleanup();
+		Pause();
+		return 1;
+	}
 
 	if (accounts.empty())
 	{

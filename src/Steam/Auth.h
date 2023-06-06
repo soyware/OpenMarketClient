@@ -273,7 +273,7 @@ namespace Steam
 					const char* msg = iterMessage->value.GetString();
 					if (msg[0])
 					{
-						putsnn(msg);
+						puts(msg); // we need newline
 						return LoginResult::UNSUCCEDED;
 					}
 				}
