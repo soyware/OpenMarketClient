@@ -196,7 +196,7 @@ namespace Steam
 			return true;
 		}
 
-		int FetchConfirmations(CURL* curl, const char* steamId64, const char* identitySecret, const char* deviceId, Curl::CResponse* out)
+		bool FetchConfirmations(CURL* curl, const char* steamId64, const char* identitySecret, const char* deviceId, rapidjson::Document* out)
 		{
 			Log(LogChannel::STEAM, "Fetching confirmations...");
 
@@ -207,8 +207,9 @@ namespace Steam
 				return false;
 			}
 
-			curl_easy_setopt(curl, CURLOPT_WRITEDATA, out);
-			curl_easy_setopt(curl, CURLOPT_URL, "https://steamcommunity.com/mobileconf/conf");
+			Curl::CResponse response;
+			curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
+			curl_easy_setopt(curl, CURLOPT_URL, "https://steamcommunity.com/mobileconf/getlist");
 			curl_easy_setopt(curl, CURLOPT_POST, 1L);
 			curl_easy_setopt(curl, CURLOPT_POSTFIELDS, postFields);
 
@@ -217,83 +218,32 @@ namespace Steam
 			if (respCode != CURLE_OK)
 			{
 				Curl::PrintError(curl, respCode);
-				return -1;
+				return false;
 			}
 
-			if (strstr(out->data, "Oh nooooooes!"))
+			out->Parse(response.data);
+
+			if (out->HasParseError())
 			{
-				putsnn("fail\n");
-				return -1;
+				putsnn("JSON parsing failed\n");
+				return false;
 			}
 
-			if (strstr(out->data, "Nothing to confirm"))
+			if (!(*out)["success"].GetBool())
 			{
-				putsnn("none\n");
-				return 0;
+				putsnn("request unsucceeded\n");
+				return false;
 			}
 
 			putsnn("ok\n");
-			return 1;
-		}
-
-		bool FindConfirmationParams(const char* html, const char* offerId, const char** outId, const char** outKey)
-		{
-			const char dataCreator[] = "data-creator=\"";
-
-			const size_t offerDataCreatorBufSz = sizeof(dataCreator) - 1 + Trade::offerIdBufSz - 1 + 1;
-			char offerDataCreator[offerDataCreatorBufSz];
-
-			char* offerDataCreatorEnd = offerDataCreator;
-			offerDataCreatorEnd = stpcpy(offerDataCreatorEnd, dataCreator);
-			strcpy(offerDataCreatorEnd, offerId);
-
-			const char* foundOfferDataCreator = strstr(html, offerDataCreator);
-			if (!foundOfferDataCreator)
-				return false;
-
-			const char* htmlTagStart = foundOfferDataCreator;
-
-			while (html < htmlTagStart && *(--htmlTagStart) != '<');
-
-			if (htmlTagStart[0] != '<')
-				return false;
-
-			const char* htmlTagEnd = strchr(foundOfferDataCreator, '>');
-			if (!htmlTagEnd)
-				return false;
-
-			const size_t htmlTagLen = (htmlTagEnd - htmlTagStart);
-
-			// find offer's confirmation id within this offer's html tag
-			// so we don't accidentally find conf id of the other offer if steam returns malformed response
-			const std::string_view htmlTagSv(htmlTagStart, htmlTagLen);
-
-			const char dataConfId[] = "data-confid=\"";
-
-			const size_t foundDataConfIdOffset = htmlTagSv.find(dataConfId);
-			if (foundDataConfIdOffset == htmlTagSv.npos)
-				return false;
-
-			const char dataKey[] = "data-key=\"";
-
-			const size_t foundDataKeyOffset = htmlTagSv.find(dataKey);
-			if (foundDataKeyOffset == htmlTagSv.npos)
-				return false;
-
-			const char* id = htmlTagStart + foundDataConfIdOffset + sizeof(dataConfId) - 1;
-			const char* key = htmlTagStart + foundDataKeyOffset + sizeof(dataKey) - 1;
-
-			*outId = id;
-			*outKey = key;
-
 			return true;
 		}
 
 		bool AcceptConfirmation(CURL* curl, 
 			const char* steamId64, const char* identitySecret, const char* deviceId, const char* offerId)
 		{
-			Curl::CResponse respConfs;
-			if (1 != FetchConfirmations(curl, steamId64, identitySecret, deviceId, &respConfs))
+			rapidjson::Document docConfs;
+			if (!FetchConfirmations(curl, steamId64, identitySecret, deviceId, &docConfs))
 				return false;
 
 			Log(LogChannel::STEAM, "Accepting confirmation...");
@@ -314,21 +264,34 @@ namespace Steam
 				return false;
 			}
 
-			const char* confId;
-			const char* confKey;
+			const char* confId = nullptr;
+			const char* confNonce = nullptr;
 
-			if (!FindConfirmationParams(respConfs.data, offerId, &confId, &confKey))
+			const rapidjson::Value& confs = docConfs["conf"];
+			const rapidjson::SizeType confCount = confs.Size();
+
+			for (rapidjson::SizeType i = 0; i < confCount; ++i)
+			{
+				const rapidjson::Value& conf = confs[i];
+
+				if (conf["type"].GetInt() == 2 && !strcmp(conf["creator_id"].GetString(), offerId))
+				{
+					confId = conf["id"].GetString();
+					confNonce = conf["nonce"].GetString();
+				}
+			}
+
+			if (!confId || !confNonce)
+			{
+				putsnn("finding confirmation params failed\n");
 				return false;
+			}
 
 			char* postFieldsEnd = postFields + strlen(postFields);
 			postFieldsEnd = stpcpy(postFieldsEnd, cId);
-			postFieldsEnd = stpncpy(postFieldsEnd, confId, (strchr(confId, '\"') - confId));
+			postFieldsEnd = stpcpy(postFieldsEnd, confId);
 			postFieldsEnd = stpcpy(postFieldsEnd, cK);
-			postFieldsEnd = stpncpy(postFieldsEnd, confKey, (strchr(confKey, '\"') - confKey));
-			postFieldsEnd[0] = '\0';
-
-			// respConfs isn't used anymore so empty it
-			respConfs.Empty();
+			strcpy(postFieldsEnd, confNonce);
 
 			Curl::CResponse respOp;
 			curl_easy_setopt(curl, CURLOPT_WRITEDATA, &respOp);
@@ -368,8 +331,8 @@ namespace Steam
 			const char* steamId64, const char* identitySecret, const char* deviceId, 
 			const char** offerIds, size_t offerIdCount)
 		{
-			Curl::CResponse respConfs;
-			if (1 != FetchConfirmations(curl, steamId64, identitySecret, deviceId, &respConfs))
+			rapidjson::Document docConfs;
+			if (!FetchConfirmations(curl, steamId64, identitySecret, deviceId, &docConfs))
 				return false;
 
 			Log(LogChannel::STEAM, "Accepting confirmations...");
@@ -400,23 +363,33 @@ namespace Steam
 
 			for (size_t i = 0; i < offerIdCount; ++i)
 			{
-				const char* confId;
-				const char* confKey;
-				if (!FindConfirmationParams(respConfs.data, offerIds[i], &confId, &confKey))
+				const char* confId = nullptr;
+				const char* confNonce = nullptr;
+
+				const rapidjson::Value& confs = docConfs["conf"];
+				const rapidjson::SizeType confCount = confs.Size();
+
+				for (rapidjson::SizeType j = 0; j < confCount; ++j)
+				{
+					const rapidjson::Value& conf = confs[j];
+
+					if (conf["type"].GetInt() == 2 && !strcmp(conf["creator_id"].GetString(), offerIds[i]))
+					{
+						confId = conf["id"].GetString();
+						confNonce = conf["nonce"].GetString();
+					}
+				}
+
+				if (!confId || !confNonce)
 					continue;
 
 				postFieldsEnd = stpcpy(postFieldsEnd, "&cid[]=");
-				postFieldsEnd = stpncpy(postFieldsEnd, confId, (strchr(confId, '\"') - confId));
+				postFieldsEnd = stpcpy(postFieldsEnd, confId);
 				postFieldsEnd = stpcpy(postFieldsEnd, "&ck[]=");
-				postFieldsEnd = stpncpy(postFieldsEnd, confKey, (strchr(confKey, '\"') - confKey));
+				postFieldsEnd = stpcpy(postFieldsEnd, confNonce);
 
 				++confirmedCount;
 			}
-
-			postFieldsEnd[0] = '\0';
-
-			// respConfs isn't used anymore so empty it
-			respConfs.Empty();
 
 			Curl::CResponse respMultiOp;
 			curl_easy_setopt(curl, CURLOPT_WRITEDATA, &respMultiOp);

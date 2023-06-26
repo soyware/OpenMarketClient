@@ -247,7 +247,7 @@ bool ReadFile(const char* path, unsigned char** out, long* outSz)
 		return false;
 	}
 
-	if (fread(contents, sizeof(unsigned char), fsize, file) != fsize)
+	if (fread(contents, sizeof(unsigned char), fsize, file) != (size_t)fsize)
 	{
 		fclose(file);
 		free(contents);

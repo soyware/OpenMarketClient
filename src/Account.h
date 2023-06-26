@@ -12,11 +12,12 @@ public:
 
 	char		steamId64[UINT64_MAX_STR_SIZE] = "";
 
-	char		oauthToken[Steam::Auth::oauthTokenBufSz] = "";
-	char		loginToken[Steam::Auth::loginTokenBufSz] = "";
+	// commented out because oauth seems to be gone
+	//char		oauthToken[Steam::Auth::oauthTokenBufSz] = "";
+	//char		loginToken[Steam::Auth::loginTokenBufSz] = "";
 
-	//char		refreshToken[Steam::Auth::jwtBufSz] = "";
-	//char		accessToken[Steam::Auth::jwtBufSz] = "";
+	char		refreshToken[Steam::Auth::jwtBufSz] = "";
+	char		accessToken[Steam::Auth::jwtBufSz] = "";
 
 	//char		sessionId[Steam::Auth::sessionIdBufSz] = "";
 
@@ -201,7 +202,7 @@ public:
 		strcpy(deviceId, parsed["device_id"].GetString());
 		//strcpy(sessionId, iterSession->value["SessionID"].GetString());
 		//strcpy(loginToken, steamLoginSecureDelim + 6);
-		strcpy(oauthToken, iterSession->value["OAuthToken"].GetString());
+		//strcpy(oauthToken, iterSession->value["OAuthToken"].GetString());	// commented out because oauth seems to be gone
 		//stpncpy(steamId64, steamLoginSecure, (steamLoginSecureDelim - steamLoginSecure))[0] = '\0';
 		strcpy(steamId64, std::to_string(iterSession->value["SteamID"].GetUint64()).c_str());
 
@@ -234,11 +235,60 @@ public:
 					identitySecret, Steam::Guard::secretsSz + 1, Steam::Guard::secretsSz))
 				return false;
 
-			Curl::CResponse response;
-			if (0 <= Steam::Guard::FetchConfirmations(curl, steamId64, identitySecret, deviceId, &response))
+			rapidjson::Document doc;
+			if (Steam::Guard::FetchConfirmations(curl, steamId64, identitySecret, deviceId, &doc))
 				break;
 		}
 		return true;
+	}
+
+	bool IsRefreshTokenValid()
+	{
+		const char* pszJwtHeaderEnd = strchr(refreshToken, '.');
+		if (!pszJwtHeaderEnd)
+		{
+			Log(LogChannel::GENERAL, "Invalid refresh token\n");
+			return false;
+		}
+
+		const char* pszJwtPayloadEnd = strchr(pszJwtHeaderEnd + 1, '.');
+		if (!pszJwtPayloadEnd)
+		{
+			Log(LogChannel::GENERAL, "Invalid refresh token\n");
+			return false;
+		}
+
+		const size_t encJwtPayloadSz = pszJwtPayloadEnd - pszJwtHeaderEnd;
+
+		char encJwtPayload[sizeof(refreshToken)];
+		memcpy(encJwtPayload, pszJwtHeaderEnd + 1, encJwtPayloadSz - 1);
+		encJwtPayload[encJwtPayloadSz - 1] = '=';
+
+		char jwtPayload[Base64ToPlainSize(sizeof(encJwtPayload))];
+		size_t jwtPayloadSz = sizeof(jwtPayload);
+
+		if (Base64_Decode((byte*)encJwtPayload, encJwtPayloadSz, (byte*)jwtPayload, &jwtPayloadSz))
+		{
+			Log(LogChannel::GENERAL, "JWT payload decoding failed\n");
+			return false;
+		}
+
+		for (size_t i = 0; i < jwtPayloadSz; ++i)
+		{
+			if (jwtPayload[i] == '-')
+				jwtPayload[i] = '+';
+			else if (jwtPayload[i] == '_')
+				jwtPayload[i] = '/';
+		}
+
+		rapidjson::Document docJwtPayload;
+		docJwtPayload.ParseInsitu(jwtPayload);
+
+		const time_t exp = docJwtPayload["exp"].GetUint64();
+
+		const time_t curTime = time(nullptr);
+	
+		return (curTime < exp);
 	}
 
 	bool Init(CURL* curl, const char* sessionId, const char* encryptPass, 
@@ -247,10 +297,13 @@ public:
 		char username[Steam::Auth::usernameBufSz] = "";
 		char sharedSecret[Steam::Guard::secretsSz + 1] = "";
 
-		if (name_)
-			strcpy(name, name_);
-		else if (!GetUserInputString("Enter new account alias", name, sizeof(name)))
-			return false;
+		if (!name[0])
+		{
+			if (name_)
+				strcpy(name, name_);
+			else if (!GetUserInputString("Enter new account alias", name, sizeof(name)))
+				return false;
+		}
 
 		if (path)
 		{
@@ -268,16 +321,25 @@ public:
 
 		bool loginRequired = true;
 
-		if (oauthToken[0])
-		{
-			const int refreshRes = Steam::Auth::RefreshOAuthSession(curl, oauthToken, loginToken);
+		// commented out because oauth seems to be gone
+		//if (oauthToken[0])
+		//{
+		//	const int refreshRes = Steam::Auth::RefreshOAuthSession(curl, oauthToken, loginToken);
 
-			if (refreshRes < 0)
-				return false;
-			else if (refreshRes == 0)
-				Log(LogChannel::GENERAL, "[%s] Steam OAuth token is invalid or has expired, login required\n", name);
-			else
+		//	if (refreshRes < 0)
+		//		return false;
+		//	else if (refreshRes == 0)
+		//		Log(LogChannel::GENERAL, "[%s] Steam OAuth token is invalid or has expired, login required\n", name);
+		//	else
+		//		loginRequired = false;
+		//}
+
+		if (refreshToken[0])
+		{
+			if (IsRefreshTokenValid())
 				loginRequired = false;
+			else
+				Log(LogChannel::GENERAL, "[%s] Steam refresh token is invalid or has expired, login required\n", name);
 		}
 
 		bool loggedIn = !loginRequired;
@@ -285,45 +347,53 @@ public:
 		if (loginRequired)
 		{
 			char password[Steam::Auth::passwordBufSz];
-			char twoFactorCode[Steam::Guard::twoFactorCodeBufSz] = "";
-
-			const auto EnterTwoFactorAuthCode = [&]
-			{
-				return GetUserInputString("Enter Steam Guard Mobile Authenticator code",
-					twoFactorCode, sizeof(twoFactorCode), Steam::Guard::twoFactorCodeBufSz - 1);
-			};
 
 			if ((username[0] || GetUserInputString("Enter Steam username", username, sizeof(username))) &&
-				GetUserInputString("Enter Steam password", password, sizeof(password), 8, false) &&
-				((sharedSecret[0] && Steam::Guard::GenerateTwoFactorAuthCode(sharedSecret, twoFactorCode)) ||
-				EnterTwoFactorAuthCode()))
+				GetUserInputString("Enter Steam password", password, sizeof(password), 8, false))
 			{
-				const size_t retryCount = 3;
+				char clientId[Steam::Auth::clientIdBufSz];
+				char requestId[Steam::Auth::requestIdBufSz];
+				int pollInterval;
 
-				for (size_t i = 0; i < retryCount; ++i)
+				if (!Steam::Auth::BeginAuthSessionViaCredentials(curl, username, password, steamId64,
+					clientId, requestId, &pollInterval))
 				{
-					const Steam::Auth::LoginResult loginRes =
-						Steam::Auth::DoLogin(curl, username, password, twoFactorCode, steamId64, oauthToken, loginToken);
+					const auto authSessionEndTime = std::chrono::high_resolution_clock::now() + 20s;
 
-					if (loginRes == Steam::Auth::LoginResult::OK)
+					while (true)
 					{
-						loggedIn = true;
-						break;
-					}
-					else if (loginRes == Steam::Auth::LoginResult::WRONG_TWO_FACTOR)
-					{
-						if (sharedSecret[0] || !EnterTwoFactorAuthCode())
+						const auto curTime = std::chrono::high_resolution_clock::now();
+
+						if (authSessionEndTime < curTime)
 							break;
-					}
-					else if ((loginRes == Steam::Auth::LoginResult::PASS_ENCRYPT_FAILED) ||
-							(loginRes == Steam::Auth::LoginResult::UNSUCCEDED) ||
-							(loginRes == Steam::Auth::LoginResult::OAUTH_FAILED))
+
+						char twoFactorCode[Steam::Guard::twoFactorCodeBufSz] = "";
+
+						if (sharedSecret[0])
+							Steam::Guard::GenerateTwoFactorAuthCode(sharedSecret, twoFactorCode);
+
+						if (!twoFactorCode[0])
+						{
+							if (!GetUserInputString("Enter Steam Guard Mobile Authenticator code",
+								twoFactorCode, sizeof(twoFactorCode), Steam::Guard::twoFactorCodeBufSz - 1))
+								break;
+						}
+
+						if (!Steam::Auth::UpdateAuthSessionWithSteamGuardCode(curl, steamId64, clientId, twoFactorCode))
 							break;
+
+						if (Steam::Auth::PollAuthSessionStatus(curl, clientId, requestId, refreshToken, accessToken))
+						{
+							loggedIn = true;
+							break;
+						}
+
+						std::this_thread::sleep_until(curTime + std::chrono::seconds(pollInterval));
+					}
 				}
 			}
 
 			memset(password, 0, sizeof(password));
-			memset(twoFactorCode, 0, sizeof(twoFactorCode));
 		}
 
 		memset(username, 0, sizeof(username));
@@ -332,10 +402,10 @@ public:
 		if (!loggedIn)
 			return false;
 
-		if (!deviceId[0] && !Steam::Guard::GetDeviceId(curl, steamId64, oauthToken, deviceId))
+		if (!deviceId[0] && !Steam::Guard::GetDeviceId(curl, steamId64, accessToken, deviceId))
 			return false;
 
-		if (!Steam::SetLoginCookie(curl, steamId64, loginToken))
+		if (!Steam::SetJWTCookies(curl, steamId64, refreshToken, accessToken))
 			return false;
 
 		if (!steamApiKey[0] && !Steam::GetApiKey(curl, sessionId, steamApiKey))
@@ -689,24 +759,25 @@ public:
 
 	bool RunMarkets(CURL* curl, const char* sessionId)
 	{
-		const int refreshRes = Steam::Auth::RefreshOAuthSession(curl, oauthToken, loginToken);
-		if (refreshRes < 0)
-		{
-			Log(LogChannel::GENERAL, "[%s] Steam session refresh failed\n", name);
-			return false;
-		}
+		// commented out because oauth seems to be gone
+		//const int refreshRes = Steam::Auth::RefreshOAuthSession(curl, oauthToken, loginToken);
+		//if (refreshRes < 0)
+		//{
+		//	Log(LogChannel::GENERAL, "[%s] Steam session refresh failed\n", name);
+		//	return false;
+		//}
 
-		if (refreshRes == 0)
-		{
-			Log(LogChannel::GENERAL, "[%s] Steam OAuth token has expired, restart required\n", name);
-			return false;
-		}
+		//if (refreshRes == 0)
+		//{
+		//	Log(LogChannel::GENERAL, "[%s] Steam OAuth token has expired, restart required\n", name);
+		//	return false;
+		//}
 
-		if (!Steam::SetLoginCookie(curl, steamId64, loginToken))
-		{
-			Log(LogChannel::GENERAL, "[%s] Setting Steam login cookie failed\n", name);
-			return false;
-		}
+		//if (!Steam::SetLoginCookie(curl, steamId64, loginToken))
+		//{
+		//	Log(LogChannel::GENERAL, "[%s] Setting Steam login cookie failed\n", name);
+		//	return false;
+		//}
 
 		bool allOk = true;
 

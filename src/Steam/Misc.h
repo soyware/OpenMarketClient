@@ -168,8 +168,6 @@ namespace Steam
 
 	bool SetJWTCookies(CURL* curl, const char* steamId64, const char* refreshToken, const char* accessToken)
 	{
-		Log(LogChannel::STEAM, "Setting refresh cookie...");
-
 		const char cookieRefreshStart[] =
 			"#HttpOnly_login.steampowered.com"	/* Hostname */
 			"\tFALSE"							/* Include subdomains */
@@ -190,11 +188,9 @@ namespace Steam
 
 		if (curl_easy_setopt(curl, CURLOPT_COOKIELIST, cookieRefresh) != CURLE_OK)
 		{
-			putsnn("fail\n");
+			Log(LogChannel::STEAM, "Setting refresh cookie failed\n");
 			return false;
 		}
-
-		putsnn("ok\n");
 
 		return SetLoginCookie(curl, steamId64, accessToken);
 	}

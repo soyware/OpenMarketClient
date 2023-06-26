@@ -19,8 +19,8 @@ namespace Steam
 
 		enum class LoginResult
 		{
-			OK,
-			GET_ENCRYPT_KEY_FAILED,
+			SUCCESS,
+			GET_PASS_ENCRYPT_KEY_FAILED,
 			PASS_ENCRYPT_FAILED,
 			CAPTCHA_FAILED,
 			REQUEST_FAILED,
@@ -29,6 +29,8 @@ namespace Steam
 			UNSUCCEDED,
 			OAUTH_FAILED,
 		};
+
+		// unused outdated oauth login start
 
 		// outHexModulus buffer size must be at least modulusSz * 2
 		// outHexExponent buffer size must be at least exponentSz * 2
@@ -139,7 +141,7 @@ namespace Steam
 			if (!GetPasswordRSAPublicKey(curl, escUsername, rsaHexModulus, rsaHexExponent, rsaTimestamp))
 			{
 				curl_free(escUsername);
-				return LoginResult::GET_ENCRYPT_KEY_FAILED;
+				return LoginResult::GET_PASS_ENCRYPT_KEY_FAILED;
 			}
 
 			Log(LogChannel::STEAM, "Decoding password RSA public key...");
@@ -155,7 +157,7 @@ namespace Steam
 			{
 				curl_free(escUsername);
 				putsnn("fail\n");
-				return LoginResult::PASS_ENCRYPT_FAILED;
+				return LoginResult::GET_PASS_ENCRYPT_KEY_FAILED;
 			}
 
 			putsnn("ok\n");
@@ -307,7 +309,7 @@ namespace Steam
 			strcpy(outLoginToken, loginToken);
 
 			putsnn("ok\n");
-			return LoginResult::OK;
+			return LoginResult::SUCCESS;
 		}
 
 		// outLoginToken buffer size must be at least loginTokenBufSz
@@ -371,7 +373,7 @@ namespace Steam
 			return 1;
 		}
 
-		// unused JWT stuff below
+
 
 		// outHexModulus buffer size must be at least modulusSz * 2
 		// outHexExponent buffer size must be at least exponentSz * 2
@@ -533,7 +535,7 @@ namespace Steam
 			}
 
 			const auto iterSteamId = iterResponse->value.FindMember("steamid");
-			if (iterSteamId == parsed.MemberEnd())
+			if (iterSteamId == iterResponse->value.MemberEnd())
 			{
 				putsnn("wrong credentials\n");
 				return false;
@@ -648,47 +650,23 @@ namespace Steam
 				return false;
 			}
 
-			const char* refreshToken = iterResponse->value["refresh_token"].GetString();
-			const char* accessToken = iterResponse->value["access_token"].GetString();
+			const auto iterRefreshToken = iterResponse->value.FindMember("refresh_token");
+			const auto iterAccessToken = iterResponse->value.FindMember("access_token");
+			if (iterRefreshToken == iterResponse->value.MemberEnd() || iterAccessToken == iterResponse->value.MemberEnd())
+			{
+				putsnn("not logged in\n");
+				return false;
+			}
 
-			strcpy(outRefreshToken, refreshToken);
-			strcpy(outAccessToken, accessToken);
+			strcpy(outRefreshToken, iterRefreshToken->value.GetString());
+			strcpy(outAccessToken, iterAccessToken->value.GetString());
 
-			putsnn("ok\n");
+			putsnn("logged in\n");
 			return true;
 		}
 
-		// outSteamId64 buffer size must be at least UINT64_MAX_STR_SIZE
-		// outRefreshToken and outAccessToken buffer size must be at least jwtBufSz
-		bool DoLoginJWT(CURL* curl, const char* username, const char* password, const char* sharedSecret, char* outSteamId64, char* outRefreshToken, char* outAccessToken)
-		{
-			char clientId[clientIdBufSz];
-			char requestId[requestIdBufSz];
-			int pollInterval;
-
-			if (!BeginAuthSessionViaCredentials(curl, username, password, outSteamId64, clientId, requestId, &pollInterval))
-				return false;
-
-			char twoFactorCode[Guard::twoFactorCodeBufSz];
-			if (!Guard::GenerateTwoFactorAuthCode(sharedSecret, twoFactorCode))
-				return false;
-
-			if (!UpdateAuthSessionWithSteamGuardCode(curl, outSteamId64, clientId, twoFactorCode))
-				return false;
-
-			// 20 seconds timeout
-			for (int i = (20 / pollInterval); i > 0; --i)
-			{
-				if (PollAuthSessionStatus(curl, clientId, requestId, outRefreshToken, outAccessToken))
-					break;
-
-				std::this_thread::sleep_for(std::chrono::seconds(pollInterval));
-			}
-
-			return false;
-		}
-
-		// only works for "client" token audience i think
+		// unused
+		// only works for "client" jwt audience i think
 		bool GenerateAccessTokenForApp(CURL* curl, const char* steamId64, const char* refreshToken, char* outAccessToken)
 		{
 			Log(LogChannel::STEAM, "Generating access token...");
