@@ -436,7 +436,7 @@ namespace Steam
 		// outSteamId64 buffer size must be at least UINT64_MAX_STR_SIZE
 		// outClientId buffer size must be at least clientIdBufSz
 		// outRequestId buffer size must be at least requestIdBufSz
-		bool BeginAuthSessionViaCredentials(CURL* curl, const char* username, const char* password, char* outSteamId64, char* outClientId, char* outRequestId, int* outPollInterval)
+		bool BeginAuthSessionViaCredentials(CURL* curl, const char* username, const char* password, char* outSteamId64, char* outClientId, char* outRequestId)
 		{
 			byte rsaHexModulus[modulusSz * 2];
 			byte rsaHexExponent[exponentSz * 2];
@@ -543,12 +543,10 @@ namespace Steam
 
 			const char* clientId = iterResponse->value["client_id"].GetString();
 			const char* requestId = iterResponse->value["request_id"].GetString();
-			const int pollInterval = iterResponse->value["interval"].GetInt();
 			const char* steamId64 = iterSteamId->value.GetString();
 
 			strcpy(outClientId, clientId);
 			strcpy(outRequestId, requestId);
-			*outPollInterval = pollInterval;
 			strcpy(outSteamId64, steamId64);
 
 			putsnn("ok\n");

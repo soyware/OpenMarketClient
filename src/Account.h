@@ -353,20 +353,11 @@ public:
 			{
 				char clientId[Steam::Auth::clientIdBufSz];
 				char requestId[Steam::Auth::requestIdBufSz];
-				int pollInterval;
 
-				if (!Steam::Auth::BeginAuthSessionViaCredentials(curl, username, password, steamId64,
-					clientId, requestId, &pollInterval))
+				if (Steam::Auth::BeginAuthSessionViaCredentials(curl, username, password, steamId64, clientId, requestId))
 				{
-					const auto authSessionEndTime = std::chrono::high_resolution_clock::now() + 20s;
-
-					while (true)
+					for (size_t i = 0; i < 3; ++i)
 					{
-						const auto curTime = std::chrono::high_resolution_clock::now();
-
-						if (authSessionEndTime < curTime)
-							break;
-
 						char twoFactorCode[Steam::Guard::twoFactorCodeBufSz] = "";
 
 						if (sharedSecret[0])
@@ -388,7 +379,7 @@ public:
 							break;
 						}
 
-						std::this_thread::sleep_until(curTime + std::chrono::seconds(pollInterval));
+						std::this_thread::sleep_for(5s);
 					}
 				}
 			}

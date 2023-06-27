@@ -6,7 +6,7 @@
 #include "Market.h"
 #include "Account.h"
 
-#define OPENMARKETCLIENT_VERSION "0.4.0"
+#define OPENMARKETCLIENT_VERSION "0.4.1"
 
 /*	
 * TODO:
