@@ -17,13 +17,11 @@ public:
 	//char		loginToken[Steam::Auth::loginTokenBufSz] = "";
 
 	char		refreshToken[Steam::Auth::jwtBufSz] = "";
-	char		accessToken[Steam::Auth::jwtBufSz] = "";
 
 	//char		sessionId[Steam::Auth::sessionIdBufSz] = "";
 
 
 	// everything below isn't saved
-
 
 	char		name[128] = "";
 
@@ -258,28 +256,27 @@ public:
 			return false;
 		}
 
-		const size_t encJwtPayloadSz = pszJwtPayloadEnd - pszJwtHeaderEnd;
+		const size_t encJwtPayloadSz = pszJwtPayloadEnd - pszJwtHeaderEnd - 1;
+
+		const size_t encJwtPayloadPaddedSz = GetBase64PaddedLen(encJwtPayloadSz);
 
 		char encJwtPayload[sizeof(refreshToken)];
-		memcpy(encJwtPayload, pszJwtHeaderEnd + 1, encJwtPayloadSz - 1);
-		encJwtPayload[encJwtPayloadSz - 1] = '=';
+		memcpy(encJwtPayload, pszJwtHeaderEnd + 1, encJwtPayloadSz);
+
+		// add padding at the end
+		for (size_t i = encJwtPayloadSz; i < encJwtPayloadPaddedSz; ++i)
+			encJwtPayload[i] = '=';
 
 		char jwtPayload[Base64ToPlainSize(sizeof(encJwtPayload))];
 		size_t jwtPayloadSz = sizeof(jwtPayload);
 
-		if (Base64_Decode((byte*)encJwtPayload, encJwtPayloadSz, (byte*)jwtPayload, &jwtPayloadSz))
+		if (Base64_Decode((byte*)encJwtPayload, encJwtPayloadPaddedSz, (byte*)jwtPayload, &jwtPayloadSz))
 		{
 			Log(LogChannel::GENERAL, "JWT payload decoding failed\n");
 			return false;
 		}
 
-		for (size_t i = 0; i < jwtPayloadSz; ++i)
-		{
-			if (jwtPayload[i] == '-')
-				jwtPayload[i] = '+';
-			else if (jwtPayload[i] == '_')
-				jwtPayload[i] = '/';
-		}
+		Base64ToBase64URL(jwtPayload, jwtPayloadSz);
 
 		rapidjson::Document docJwtPayload;
 		docJwtPayload.ParseInsitu(jwtPayload);
@@ -319,6 +316,8 @@ public:
 			}
 		}
 
+		char accessToken[Steam::Auth::jwtBufSz] = "";
+
 		bool loginRequired = true;
 
 		// commented out because oauth seems to be gone
@@ -336,7 +335,10 @@ public:
 
 		if (refreshToken[0])
 		{
-			if (IsRefreshTokenValid())
+			if (IsRefreshTokenValid() &&
+				Steam::SetRefreshCookie(curl, steamId64, refreshToken) && 
+				Steam::Auth::RefreshJWTSession(curl, accessToken) &&
+				Steam::SetLoginCookie(curl, steamId64, accessToken))
 				loginRequired = false;
 			else
 				Log(LogChannel::GENERAL, "[%s] Steam refresh token is invalid or has expired, login required\n", name);
@@ -381,6 +383,18 @@ public:
 
 						std::this_thread::sleep_for(5s);
 					}
+
+					if (loggedIn)
+					{
+						if (!Steam::SetRefreshCookie(curl, steamId64, refreshToken) ||
+							!Steam::SetLoginCookie(curl, steamId64, accessToken))
+						{
+							memset(refreshToken, 0, sizeof(refreshToken));
+							memset(accessToken, 0, sizeof(accessToken));
+
+							loggedIn = false;
+						}
+					}
 				}
 			}
 
@@ -396,8 +410,7 @@ public:
 		if (!deviceId[0] && !Steam::Guard::GetDeviceId(curl, steamId64, accessToken, deviceId))
 			return false;
 
-		if (!Steam::SetJWTCookies(curl, steamId64, refreshToken, accessToken))
-			return false;
+		memset(accessToken, 0, sizeof(accessToken));
 
 		if (!steamApiKey[0] && !Steam::GetApiKey(curl, sessionId, steamApiKey))
 			return false;
@@ -416,6 +429,8 @@ public:
 					std::filesystem::remove(path);
 			}
 		}
+
+		memset(refreshToken, 0, sizeof(refreshToken));
 
 		if (!Steam::SetInventoryPublic(curl, sessionId, steamId64))
 			return false;
@@ -764,11 +779,21 @@ public:
 		//	return false;
 		//}
 
-		//if (!Steam::SetLoginCookie(curl, steamId64, loginToken))
-		//{
-		//	Log(LogChannel::GENERAL, "[%s] Setting Steam login cookie failed\n", name);
-		//	return false;
-		//}
+		char accessToken[Steam::Auth::jwtBufSz];
+
+		if (!Steam::Auth::RefreshJWTSession(curl, accessToken))
+		{
+			Log(LogChannel::GENERAL, "[%s] Steam session refresh failed\n", name);
+			return false;
+		}
+
+		if (!Steam::SetLoginCookie(curl, steamId64, accessToken))
+		{
+			Log(LogChannel::GENERAL, "[%s] Setting Steam login cookie failed\n", name);
+			return false;
+		}
+
+		memset(accessToken, 0, sizeof(accessToken));
 
 		bool allOk = true;
 

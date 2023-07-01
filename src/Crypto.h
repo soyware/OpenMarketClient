@@ -27,6 +27,29 @@ constexpr word32 PlainToBase64Size(size_t inLen, Escaped escaped)
 	return outSz;
 }
 
+constexpr size_t GetBase64PaddedLen(size_t inLen)
+{
+	size_t outLen = inLen;
+
+	const size_t multiple = 4;
+	const size_t remainder = inLen % multiple;
+	if (remainder != 0)
+		outLen += multiple - remainder;
+
+	return outLen;
+}
+
+void Base64ToBase64URL(char* in, size_t len)
+{
+	for (size_t i = 0; i < len; ++i)
+	{
+		if (in[i] == '-')
+			in[i] = '+';
+		else if (in[i] == '_')
+			in[i] = '/';
+	}
+}
+
 namespace Crypto
 {
 	bool Encrypt(const char* password, word32 keySz, int scryptCost, int scryptBlockSz, int scryptParallel,

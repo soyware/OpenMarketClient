@@ -721,5 +721,78 @@ namespace Steam
 			putsnn("ok\n");
 			return true;
 		}
+
+		bool RefreshJWTSession(CURL* curl, char* outAccessToken)
+		{
+			Curl::CResponse response;
+			curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
+			curl_easy_setopt(curl, CURLOPT_URL, "https://login.steampowered.com/jwt/refresh?redir=https://steamcommunity.com/");
+			curl_easy_setopt(curl, CURLOPT_HTTPGET, 1L);
+
+			// steam returns expiry time "1" for some reason, which makes cookie expire instantly, so we must parse cookie manually
+			curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 0L);
+
+			const CURLcode respCodeRefresh = curl_easy_perform(curl);
+
+			if (respCodeRefresh != CURLE_OK)
+			{
+				Log(LogChannel::STEAM, "Refreshing session failed: ");
+				Curl::PrintError(curl, respCodeRefresh);
+				return false;
+			}
+
+			char* followUrl;
+			if ((curl_easy_getinfo(curl, CURLINFO_REDIRECT_URL, &followUrl) != CURLE_OK) || !followUrl)
+			{
+				Log(LogChannel::STEAM, "Refreshing session failed: getting redirect URL failed\n");
+				return false;
+			}
+
+			if (!strcmp(followUrl, "https://steamcommunity.com/"))
+			{
+				curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+
+				Log(LogChannel::STEAM, "Refreshing session failed: refresh token is invalid or has expired\n");
+				return false;
+			}
+
+			curl_easy_setopt(curl, CURLOPT_URL, followUrl);
+
+			const CURLcode respCodeFollow = curl_easy_perform(curl);
+
+			curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+
+			if (respCodeFollow != CURLE_OK)
+			{
+				Log(LogChannel::STEAM, "Refreshing session failed: ");
+				Curl::PrintError(curl, respCodeFollow);
+				return false;
+			}
+
+			curl_slist* cookies;
+			if ((curl_easy_getinfo(curl, CURLINFO_COOKIELIST, &cookies) != CURLE_OK) || !cookies)
+			{
+				Log(LogChannel::STEAM, "Refreshing session failed: getting cookies failed\n");
+				return false;
+			}
+
+			curl_slist* cookiesIter = cookies;
+			while (cookiesIter && !strstr(cookiesIter->data, "\tsteamLoginSecure\t"))
+				cookiesIter = cookiesIter->next;
+
+			if (!cookiesIter)
+			{
+				curl_slist_free_all(cookies);
+
+				Log(LogChannel::STEAM, "Refreshing session failed: steamLoginSecure not found\n");
+				return false;
+			}
+
+			strcpy(outAccessToken, strchr(cookiesIter->data, '%') + 6);
+
+			curl_slist_free_all(cookies);
+
+			return true;
+		}
 	}
 }

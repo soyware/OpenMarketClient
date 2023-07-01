@@ -110,25 +110,27 @@ namespace Steam
 		return true;
 	}
 
+	bool SetCookie(CURL* curl, const char* domain, const char* name, const char* value)
+	{
+		char cookie[1024];
+
+		char* cookieEnd = cookie;
+		cookieEnd = stpcpy(cookieEnd, domain); 	/* Hostname */
+		cookieEnd = stpcpy(cookieEnd, "\tFALSE"	/* Include subdomains */
+			"\t/"								/* Path */
+			"\tTRUE"							/* Secure */
+			"\t0"								/* Expiry in epoch time format. 0 == session */
+			"\t");
+		cookieEnd = stpcpy(cookieEnd, name);	/* Name */
+		*cookieEnd++ = '\t';
+		strcpy(cookieEnd, value);				/* Value */
+
+		return (curl_easy_setopt(curl, CURLOPT_COOKIELIST, cookie) == CURLE_OK);
+	}
+
 	bool SetSessionCookie(CURL* curl, const char* sessionId)
 	{
-		const char cookieSessionStart[] =
-			"steamcommunity.com"
-			"\tFALSE"
-			"\t/"
-			"\tTRUE"
-			"\t0"
-			"\tsessionid"
-			"\t";
-
-		const size_t cookieSessionBufSz = sizeof(cookieSessionStart) - 1 + sessionIdBufSz - 1 + 1;
-		char cookieSession[cookieSessionBufSz];
-
-		char* cookieSessionEnd = cookieSession;
-		cookieSessionEnd = stpcpy(cookieSessionEnd, cookieSessionStart);
-		strcpy(cookieSessionEnd, sessionId);
-
-		if (curl_easy_setopt(curl, CURLOPT_COOKIELIST, cookieSession) != CURLE_OK)
+		if (!SetCookie(curl, "steamcommunity.com", "sessionid", sessionId))
 		{
 			Log(LogChannel::STEAM, "Setting session ID cookie failed\n");
 			return false;
@@ -139,25 +141,15 @@ namespace Steam
 
 	bool SetLoginCookie(CURL* curl, const char* steamId64, const char* loginToken)
 	{
-		const char cookieLoginStart[] =
-			"#HttpOnly_steamcommunity.com"
-			"\tFALSE"
-			"\t/"
-			"\tTRUE"
-			"\t0"
-			"\tsteamLoginSecure"
-			"\t";
-
-		const size_t cookieLoginBufSz = sizeof(cookieLoginStart) - 1 + Auth::jwtBufSz - 1 + 1;
+		const size_t cookieLoginBufSz = UINT64_MAX_STR_SIZE - 1 + Auth::jwtBufSz - 1 + 1;
 		char cookieLogin[cookieLoginBufSz];
 
 		char* cookieLoginEnd = cookieLogin;
-		cookieLoginEnd = stpcpy(cookieLoginEnd, cookieLoginStart);
 		cookieLoginEnd = stpcpy(cookieLoginEnd, steamId64);
 		cookieLoginEnd = stpcpy(cookieLoginEnd, "%7C%7C");
 		strcpy(cookieLoginEnd, loginToken);
 
-		if (curl_easy_setopt(curl, CURLOPT_COOKIELIST, cookieLogin) != CURLE_OK)
+		if (!SetCookie(curl, "#HttpOnly_steamcommunity.com", "steamLoginSecure", cookieLogin))
 		{
 			Log(LogChannel::STEAM, "Setting login cookie failed\n");
 			return false;
@@ -166,33 +158,23 @@ namespace Steam
 		return true;
 	}
 
-	bool SetJWTCookies(CURL* curl, const char* steamId64, const char* refreshToken, const char* accessToken)
+	bool SetRefreshCookie(CURL* curl, const char* steamId64, const char* refreshToken)
 	{
-		const char cookieRefreshStart[] =
-			"#HttpOnly_login.steampowered.com"	/* Hostname */
-			"\tFALSE"							/* Include subdomains */
-			"\t/"								/* Path */
-			"\tTRUE"							/* Secure */
-			"\t0"								/* Expiry in epoch time format. 0 == Session */
-			"\tsteamRefresh_steam"				/* Name */
-			"\t";								/* Value */
-
-		const size_t cookieRefreshBufSz = sizeof(cookieRefreshStart) - 1 + Auth::jwtBufSz - 1 + 1;
+		const size_t cookieRefreshBufSz = UINT64_MAX_STR_SIZE - 1 + Auth::jwtBufSz - 1 + 1;
 		char cookieRefresh[cookieRefreshBufSz];
 
 		char* cookieRefreshEnd = cookieRefresh;
-		cookieRefreshEnd = stpcpy(cookieRefreshEnd, cookieRefreshStart);
 		cookieRefreshEnd = stpcpy(cookieRefreshEnd, steamId64);
 		cookieRefreshEnd = stpcpy(cookieRefreshEnd, "%7C%7C");
 		strcpy(cookieRefreshEnd, refreshToken);
 
-		if (curl_easy_setopt(curl, CURLOPT_COOKIELIST, cookieRefresh) != CURLE_OK)
+		if (!SetCookie(curl, "#HttpOnly_login.steampowered.com", "steamRefresh_steam", cookieRefresh))
 		{
 			Log(LogChannel::STEAM, "Setting refresh cookie failed\n");
 			return false;
 		}
 
-		return SetLoginCookie(curl, steamId64, accessToken);
+		return true;
 	}
 
 	bool SetInventoryPublic(CURL* curl, const char* sessionId, const char* steamId64)
@@ -243,6 +225,7 @@ namespace Steam
 
 		if (respCode != CURLE_OK)
 		{
+			putsnn("get ");
 			Curl::PrintError(curl, respCode);
 			return false;
 		}
@@ -343,6 +326,7 @@ namespace Steam
 
 		if (respCode != CURLE_OK)
 		{
+			putsnn("set ");
 			Curl::PrintError(curl, respCode);
 			return false;
 		}
