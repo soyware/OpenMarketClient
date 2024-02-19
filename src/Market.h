@@ -37,14 +37,14 @@ namespace Market
 
 	const size_t marketBaseUrlMaxSz = sizeof("https://market.dota2.net/api/v2/");
 
-	const bool isMarketP2P[] =
-	{
-		true,
-		true,
-		true,
-		true,
-		false,
-	};
+	//const bool isMarketP2P[] =
+	//{
+	//	true,
+	//	true,
+	//	true,
+	//	true,
+	//	true,
+	//};
 
 	enum class ItemStatus
 	{

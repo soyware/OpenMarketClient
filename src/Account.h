@@ -827,23 +827,22 @@ public:
 
 			if (marketStatus & (int)MarketStatus::SOLD)
 			{
-				if (Market::isMarketP2P[i])
-				{
+				//if (Market::isMarketP2P[i])
+				//{
 					if (!GiveItemsP2P(curl, sessionId, i))
 						allOk = false;
-				}
-				else
-				{
-					if (!GiveItemBot(curl, sessionId, i))
-						allOk = false;
-				}
+				//}
+				//else
+				//{
+					//if (!GiveItemBot(curl, sessionId, i))
+					//	allOk = false;
+				//}
 			}
-			else
-			{
-				if (!Market::isMarketP2P[i])
-					givenOfferIds[i].clear();
-			}
-
+			//else
+			//{
+			//	if (!Market::isMarketP2P[i])
+			//		givenOfferIds[i].clear();
+			//}
 
 			if (marketStatus & (int)MarketStatus::BOUGHT)
 			{

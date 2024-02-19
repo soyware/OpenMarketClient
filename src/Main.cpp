@@ -6,7 +6,7 @@
 #include "Market.h"
 #include "Account.h"
 
-#define OPENMARKETCLIENT_VERSION "0.4.2"
+#define OPENMARKETCLIENT_VERSION "0.4.3"
 
 /*	
 * TODO:
@@ -242,7 +242,7 @@ int main(int argc, char** argv)
 		if (1 < accountCount)
 			putchar('\n');
 
-		std::this_thread::sleep_for(1min + 10s);
+		std::this_thread::sleep_for(1min);
 	}
 
 	curl_easy_cleanup(curl);
