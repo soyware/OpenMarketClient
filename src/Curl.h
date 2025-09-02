@@ -86,6 +86,7 @@ namespace Curl
 
 		if (respCode != CURLE_OK)
 		{
+			remove(path);
 			PrintError(curl, respCode);
 			return false;
 		}
@@ -96,11 +97,25 @@ namespace Curl
 
 	bool SetCACert(CURL* curl, const char* path)
 	{
+		bool certOk = false;
+
 		FILE* file = fopen(path, "rb");
-		// check if the certificate file exists, if not, download
+		// check if the certificate file exists and isn't too old
 		if (file)
+		{
+			struct _stat fileStat;
+
+			if (!_fstat(_fileno(file), &fileStat)) {
+				const double modTimeDiff = difftime(time(nullptr), fileStat.st_mtime);
+
+				// (90 days)
+				certOk = modTimeDiff < (60.0 * 60.0 * 24.0 * 90.0);
+			}
+
 			fclose(file);
-		else if (!DownloadCACert(curl, path))
+		}
+
+		if (!certOk && !DownloadCACert(curl, path))
 			return false;
 
 		if (curl_easy_setopt(curl, CURLOPT_CAINFO, path) != CURLE_OK)

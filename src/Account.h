@@ -4,7 +4,6 @@
 
 class CAccount
 {
-public:
 	char		marketApiKey[Market::apiKeySz + 1] = "";
 	char		identitySecret[Steam::Guard::secretsSz + 1] = "";
 	char		deviceId[Steam::Guard::deviceIdBufSz] = "";
@@ -23,7 +22,7 @@ public:
 
 	// everything below isn't saved
 
-	char		name[128] = "";
+	char		name[PATH_MAX] = "";
 
 	class COffer
 	{
@@ -45,9 +44,11 @@ public:
 	std::vector<std::string>	takenOfferIds[(int)Market::Market::COUNT];
 
 
+public:
 	static constexpr const char	directory[] = "accounts";
 	static constexpr const char	extension[] = ".bin";
 
+private:
 	static constexpr int		scryptCost = 16;			// (128 * (2^16) * 8) = 64 MB RAM
 	static constexpr int		scryptBlockSz = 8;
 	static constexpr int		scryptParallel = 1;
@@ -76,7 +77,7 @@ public:
 		if (encryptFailed)
 			return false;
 
-		Log(LogChannel::GENERAL, "[%s] Saving...", name);
+		Log(LogChannel::GENERAL, "Saving...");
 
 		const std::filesystem::path dir(directory);
 
@@ -121,7 +122,7 @@ public:
 
 	bool Load(const char* path, const char* decryptPass)
 	{
-		Log(LogChannel::GENERAL, "[%s] Reading...", name);
+		Log(LogChannel::GENERAL, "Reading...");
 
 		unsigned char* contents = nullptr;
 		long contentsSz = 0;
@@ -158,7 +159,7 @@ public:
 	// outSharedSecret buffer size must be at least Steam::Guard::secretsSz + 1
 	bool ImportMaFile(const char* path, char* outUsername, char* outSharedSecret)
 	{
-		Log(LogChannel::GENERAL, "[%s] Importing maFile...", name);
+		Log(LogChannel::GENERAL, "Importing maFile...");
 
 		unsigned char* contents = nullptr;
 		long contentsSz = 0;
@@ -240,9 +241,9 @@ public:
 		return true;
 	}
 
-	bool IsRefreshTokenValid()
+	bool DidJWTExpire(const char* jwt)
 	{
-		const char* pszJwtHeaderEnd = strchr(refreshToken, '.');
+		const char* pszJwtHeaderEnd = strchr(jwt, '.');
 		if (!pszJwtHeaderEnd)
 		{
 			Log(LogChannel::GENERAL, "Invalid refresh token\n");
@@ -259,48 +260,72 @@ public:
 		const size_t encJwtPayloadSz = pszJwtPayloadEnd - pszJwtHeaderEnd - 1;
 
 		const size_t encJwtPayloadPaddedSz = GetBase64PaddedLen(encJwtPayloadSz);
+		byte* encJwtPayloadPadded = (byte*)malloc(encJwtPayloadPaddedSz);
+		if (!encJwtPayloadPadded)
+		{
+			Log(LogChannel::GENERAL, "Padded JWT payload allocation failed\n");
+			return false;
+		}
 
-		char encJwtPayload[sizeof(refreshToken)];
-		memcpy(encJwtPayload, pszJwtHeaderEnd + 1, encJwtPayloadSz);
+		memcpy(encJwtPayloadPadded, pszJwtHeaderEnd + 1, encJwtPayloadSz);
 
 		// add padding at the end
 		for (size_t i = encJwtPayloadSz; i < encJwtPayloadPaddedSz; ++i)
-			encJwtPayload[i] = '=';
+			encJwtPayloadPadded[i] = '=';
 
-		char jwtPayload[Base64ToPlainSize(sizeof(encJwtPayload))];
-		size_t jwtPayloadSz = sizeof(jwtPayload);
-
-		if (Base64_Decode((byte*)encJwtPayload, encJwtPayloadPaddedSz, (byte*)jwtPayload, &jwtPayloadSz))
+		word32 jwtPayloadSz = Base64ToPlainSize(encJwtPayloadPaddedSz, WC_NO_NL_ENC);
+		// add null for rapidjson
+		char* jwtPayload = (char*)malloc(jwtPayloadSz + 1);
+		if (!jwtPayload)
 		{
+			free(encJwtPayloadPadded);
+			Log(LogChannel::GENERAL, "Plaintext JWT payload allocation failed\n");
+			return false;
+		}
+
+		Base64URLToBase64(jwtPayload, jwtPayloadSz);
+
+		if (Base64_Decode(encJwtPayloadPadded, encJwtPayloadPaddedSz, (byte*)jwtPayload, &jwtPayloadSz))
+		{
+			free(encJwtPayloadPadded);
+			free(jwtPayload);
+
 			Log(LogChannel::GENERAL, "JWT payload decoding failed\n");
 			return false;
 		}
 
-		Base64ToBase64URL(jwtPayload, jwtPayloadSz);
+		jwtPayload[jwtPayloadSz] = '\0';
+
+		free(encJwtPayloadPadded);
 
 		rapidjson::Document docJwtPayload;
 		docJwtPayload.ParseInsitu(jwtPayload);
 
 		const time_t exp = docJwtPayload["exp"].GetUint64();
 
+		free(jwtPayload);
+
 		const time_t curTime = time(nullptr);
-	
-		return (curTime < exp);
+
+		return (curTime >= exp);
 	}
 
+public:
 	bool Init(CURL* curl, const char* sessionId, const char* encryptPass, 
-		const char* name_ = nullptr, const char* path = nullptr, bool isMaFile = false)
+		const char* argName = nullptr, const char* path = nullptr, bool isMaFile = false)
 	{
 		char username[Steam::Auth::usernameBufSz] = "";
 		char sharedSecret[Steam::Guard::secretsSz + 1] = "";
 
 		if (!name[0])
 		{
-			if (name_)
-				strcpy(name, name_);
+			if (argName)
+				strcpy(name, argName);
 			else if (!GetUserInputString("Enter new account alias", name, sizeof(name)))
 				return false;
 		}
+
+		CLoggingContext loggingContext(name);
 
 		if (path)
 		{
@@ -335,13 +360,13 @@ public:
 
 		if (refreshToken[0])
 		{
-			if (IsRefreshTokenValid() &&
+			if (!DidJWTExpire(refreshToken) &&
 				Steam::SetRefreshCookie(curl, steamId64, refreshToken) && 
 				Steam::Auth::RefreshJWTSession(curl, accessToken) &&
 				Steam::SetLoginCookie(curl, steamId64, accessToken))
 				loginRequired = false;
 			else
-				Log(LogChannel::GENERAL, "[%s] Steam refresh token is invalid or has expired, login required\n", name);
+				Log(LogChannel::GENERAL, "Steam refresh token is invalid or has expired, login required\n");
 		}
 
 		bool loggedIn = !loginRequired;
@@ -435,6 +460,9 @@ public:
 		if (!Steam::SetInventoryPublic(curl, sessionId, steamId64))
 			return false;
 
+		if (!Steam::AcknowledgeTradeProtection(curl, sessionId))
+			return false;
+
 		if (!Market::SetSteamDetails(curl, marketApiKey, steamApiKey))
 			return false;
 
@@ -444,6 +472,7 @@ public:
 		return true;
 	}
 
+private:
 	// remove inactive and cancel expired
 	bool CancelExpiredSentOffers(CURL* curl, const char* sessionId)
 	{
@@ -544,12 +573,11 @@ public:
 		BOUGHT = (1 << 1)
 	};
 
-	int GetMarketStatus(CURL* curl, int market, rapidjson::SizeType* outItemCount)
+	int GetMarketStatus(CURL* curl, int market, rapidjson::Document* outDocItems)
 	{
-		rapidjson::Document docItems;
-		if (!Market::GetItems(curl, marketApiKey, market, &docItems))
+		if (!Market::GetItems(curl, marketApiKey, market, outDocItems))
 		{
-			Log(LogChannel::GENERAL, "[%s] [%s] Getting items status failed\n", name, Market::marketNames[market]);
+			Log(LogChannel::GENERAL, "[%s] Getting items status failed\n", Market::marketNames[market]);
 			return -1;
 		}
 
@@ -558,18 +586,23 @@ public:
 
 		int marketStatus = 0;
 
-		const rapidjson::Value& items = docItems["items"];
+		const rapidjson::Value& items = (*outDocItems)["items"];
 		const rapidjson::SizeType itemCount = (items.IsArray() ? items.Size() : 0);
 
 		for (rapidjson::SizeType i = 0; i < itemCount; ++i)
 		{
 			const rapidjson::Value& item = items[i];
 
-			// status is a string, convert it to int
+			// status is a char, convert it to int
 			const int itemStatus = (item["status"].GetString()[0] - '0');
 
 			if (itemStatus == (int)Market::ItemStatus::GIVE)
 			{
+				// poor mans 'trading protection' check
+				const int left = item["left"].GetInt();
+				if (left < 1)
+					continue;
+
 				const char* itemId = item["item_id"].GetString();
 
 				bool given = false;
@@ -588,13 +621,18 @@ public:
 					marketGivenItemIds.emplace_back(itemId);
 
 					const char* itemName = item["market_hash_name"].GetString();
-					Log(LogChannel::GENERAL, "[%s] [%s] Sold \"%s\"\n", name, Market::marketNames[market], itemName);
+					Log(LogChannel::GENERAL, "[%s] Sold \"%s\"\n", Market::marketNames[market], itemName);
 				}
 
 				marketStatus |= (int)MarketStatus::SOLD;
 			}
 			else if (itemStatus == (int)Market::ItemStatus::TAKE)
 			{
+				// poor mans 'trading protection' check
+				const int left = item["left"].GetInt();
+				if (left < 1)
+					continue;
+
 				const char* itemId = item["item_id"].GetString();
 
 				bool taken = false;
@@ -613,7 +651,7 @@ public:
 					marketTakenItemIds.emplace_back(itemId);
 
 					const char* itemName = item["market_hash_name"].GetString();
-					Log(LogChannel::GENERAL, "[%s] [%s] Bought \"%s\"\n", name, Market::marketNames[market], itemName);
+					Log(LogChannel::GENERAL, "[%s] Bought \"%s\"\n", Market::marketNames[market], itemName);
 				}
 
 				marketStatus |= (int)MarketStatus::BOUGHT;
@@ -625,8 +663,6 @@ public:
 
 		if (!(marketStatus & (int)MarketStatus::BOUGHT))
 			marketTakenItemIds.clear();
-
-		*outItemCount = itemCount;
 
 		return marketStatus;
 	}
@@ -695,8 +731,8 @@ public:
 			if (!offer["items"].Accept(itemsWriter))
 			{
 				allOk = false;
-				Log(LogChannel::GENERAL, "[%s] [%s] Converting offer items JSON to string failed\n",
-					name, Market::marketNames[market]);
+				Log(LogChannel::GENERAL, 
+					"[%s] Converting offer items JSON to string failed\n", Market::marketNames[market]);
 				continue;
 			}
 
@@ -721,17 +757,22 @@ public:
 			}
 
 			sentOffers[market].emplace_back(offerHash, sentOfferId);
+
+			if (!Market::TradeReady(curl, marketApiKey, market, sentOfferId))
+			{
+				allOk = false;
+				continue;
+			}
 		}
 
 		return allOk;
 	}
 
-	bool TakeItems(CURL* curl, const char* sessionId, int market)
+	bool TakeItem(CURL* curl, const char* sessionId, int market, const char* partnerId32 = nullptr)
 	{
 		char offerId[Steam::Trade::offerIdBufSz];
-		char partnerId64[UINT64_MAX_STR_SIZE];
 
-		if (!Market::RequestTake(curl, marketApiKey, market, offerId, partnerId64))
+		if (!Market::RequestTake(curl, marketApiKey, market, partnerId32, offerId))
 			return false;
 
 		for (const auto& takenOfferId : takenOfferIds[market])
@@ -740,7 +781,11 @@ public:
 				return true;
 		}
 
-		if (!Steam::Trade::Accept(curl, sessionId, offerId, partnerId64))
+		const uint32_t nPartnerId32 = atol(partnerId32);
+
+		const std::string partnerId64(std::to_string(Steam::SteamID32To64(nPartnerId32)));
+
+		if (!Steam::Trade::Accept(curl, sessionId, offerId, partnerId64.c_str()))
 			return false;
 
 		takenOfferIds[market].emplace_back(offerId);
@@ -748,9 +793,45 @@ public:
 		return true;
 	}
 
+	bool TakeItems(CURL* curl, const char* sessionId, int market, rapidjson::Document* docItems)
+	{
+		const rapidjson::Value& items = (*docItems)["items"];
+		if (!items.IsArray())
+			return true;
+
+		std::unordered_set<std::string> partnerIds32;
+
+		for (const auto& item : items.GetArray())
+		{
+			const int itemStatus = (item["status"].GetString()[0] - '0');
+
+			if (itemStatus == (int)Market::ItemStatus::TAKE)
+			{
+				// poor mans 'trading protection' check
+				const int left = item["left"].GetInt();
+				if (left < 1)
+					continue;
+
+				const auto iterBotId = item.FindMember("botid");
+				if (iterBotId != item.MemberEnd())
+					partnerIds32.insert(iterBotId->value.GetString());
+			}
+		}
+
+		bool allOk = true;
+
+		for (const auto& partnerId32 : partnerIds32)
+		{
+			if (!TakeItem(curl, sessionId, market, partnerId32.c_str()))
+				allOk = false;
+		}
+
+		return allOk;
+	}
+
 	void PrintListings(const rapidjson::SizeType* itemCounts)
 	{
-		Log(LogChannel::GENERAL, "[%s] Listings: ", name);
+		Log(LogChannel::GENERAL, "Listings: ");
 
 		for (int i = 0; i < (int)Market::Market::COUNT; ++i)
 		{
@@ -763,8 +844,11 @@ public:
 		putchar('\n');
 	}
 
-	bool RunMarkets(CURL* curl, const char* sessionId)
+public:
+	bool RunMarkets(CURL* curl, const char* sessionId, const char* proxy)
 	{
+		CLoggingContext loggingContext(name);
+
 		// commented out because oauth seems to be gone
 		//const int refreshRes = Steam::Auth::RefreshOAuthSession(curl, oauthToken, loginToken);
 		//if (refreshRes < 0)
@@ -783,53 +867,59 @@ public:
 
 		if (!Steam::Auth::RefreshJWTSession(curl, accessToken))
 		{
-			Log(LogChannel::GENERAL, "[%s] Steam session refresh failed\n", name);
+			Log(LogChannel::GENERAL, "Steam session refresh failed\n");
 			return false;
 		}
 
 		if (!Steam::SetLoginCookie(curl, steamId64, accessToken))
 		{
-			Log(LogChannel::GENERAL, "[%s] Setting Steam login cookie failed\n", name);
+			Log(LogChannel::GENERAL, "Setting Steam login cookie failed\n");
 			return false;
 		}
 
-		memset(accessToken, 0, sizeof(accessToken));
-
 		bool allOk = true;
+
+		if (!Market::PingNew(curl, marketApiKey, accessToken, proxy))
+			allOk = false;
+
+		memset(accessToken, 0, sizeof(accessToken));
 
 		if (!CancelExpiredSentOffers(curl, sessionId))
 		{
 			allOk = false;
-			Log(LogChannel::GENERAL, "[%s] Cancelling some of the expired sent offers failed, "
-				"manually cancel the sent offers older than 15 mins if the error continues\n", name);
+			Log(LogChannel::GENERAL, "Cancelling some of the expired sent offers failed, "
+				"manually cancel the sent offers older than 15 mins if the error persists\n");
 		}
-
-		if (!Market::Ping(curl, marketApiKey))
-			allOk = false;
 
 		rapidjson::SizeType itemCounts[(int)Market::Market::COUNT] = { 0 };
 
-		for (int i = 0; i < (int)Market::Market::COUNT; ++i)
+		for (int marketIter = 0; marketIter < (int)Market::Market::COUNT; ++marketIter)
 		{
-			const int marketStatus = GetMarketStatus(curl, i, &itemCounts[i]);
-
+			rapidjson::Document docItems;
+			const int marketStatus = GetMarketStatus(curl, marketIter, &docItems);
+			
 			if (marketStatus < 0)
 			{
 				allOk = false;
 				continue;
 			}
 
+			const rapidjson::Value& items = docItems["items"];
+			itemCounts[marketIter] = (items.IsArray() ? items.Size() : 0);
+
 			if (!marketStatus)
 				continue;
+
 #ifdef _WIN32
 			FlashCurrentWindow();
 #endif // _WIN32
 
 			if (marketStatus & (int)MarketStatus::SOLD)
 			{
+				// commented out because all markets are p2p now
 				//if (Market::isMarketP2P[i])
-				//{
-					if (!GiveItemsP2P(curl, sessionId, i))
+				//{				
+					if (!GiveItemsP2P(curl, sessionId, marketIter))
 						allOk = false;
 				//}
 				//else
@@ -838,19 +928,19 @@ public:
 					//	allOk = false;
 				//}
 			}
-			//else
-			//{
-			//	if (!Market::isMarketP2P[i])
-			//		givenOfferIds[i].clear();
-			//}
+			else
+			{
+				//if (!Market::isMarketP2P[i])
+				//	givenOfferIds[i].clear();
+			}
 
 			if (marketStatus & (int)MarketStatus::BOUGHT)
 			{
-				if (!TakeItems(curl, sessionId, i))
+				if (!TakeItems(curl, sessionId, marketIter, &docItems))
 					allOk = false;
 			}
 			else
-				takenOfferIds[i].clear();
+				takenOfferIds[marketIter].clear();
 		}
 
 		PrintListings(itemCounts);

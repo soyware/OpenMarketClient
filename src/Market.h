@@ -74,6 +74,7 @@ namespace Market
 		return ::curl_easy_perform(curl);
 	}
 
+	// deprecated
 	bool Ping(CURL* curl, const char* apiKey)
 	{
 		const char query[] = "ping?key=";
@@ -90,6 +91,83 @@ namespace Market
 		curl_easy_setopt(curl, CURLOPT_NOBODY, 1L);
 
 		return (curl_easy_perform(curl) == CURLE_OK);
+	}
+
+	bool PingNew(CURL* curl, const char* apiKey, const char* accessToken, const char* proxy)
+	{
+		const char query[] = "ping-new?key=";
+
+		const size_t urlBufSz = marketBaseUrlMaxSz - 1 + sizeof(query) - 1 + apiKeySz + 1;
+		char url[urlBufSz];
+
+		char* urlEnd = url;
+		urlEnd = stpcpy(urlEnd, marketBaseUrls[(int)Market::CSGO]);
+		urlEnd = stpcpy(urlEnd, query);
+		strcpy(urlEnd, apiKey);
+
+		rapidjson::Document jsonDoc;
+		jsonDoc.SetObject();
+		jsonDoc.AddMember("access_token", 
+			rapidjson::Value(accessToken, jsonDoc.GetAllocator()).Move(),
+			jsonDoc.GetAllocator());
+
+		if (proxy)
+		{
+			jsonDoc.AddMember("proxy",
+				rapidjson::Value(proxy, jsonDoc.GetAllocator()).Move(),
+				jsonDoc.GetAllocator());
+		}
+		
+		rapidjson::StringBuffer buffer;
+		rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
+		jsonDoc.Accept(writer);
+		const char* jsonStr = buffer.GetString();
+
+		curl_easy_setopt(curl, CURLOPT_URL, url);
+		curl_easy_setopt(curl, CURLOPT_POSTFIELDS, jsonStr);
+		
+		curl_slist* headers = NULL;
+		headers = curl_slist_append(headers, "Content-Type: application/json");
+		curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+
+		Curl::CResponse response;
+		curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
+
+		const CURLcode res = curl_easy_perform(curl);
+
+		curl_easy_setopt(curl, CURLOPT_HTTPHEADER, NULL);
+		curl_slist_free_all(headers);
+
+		if (res != CURLE_OK)
+			return false;
+
+		rapidjson::Document parsed;
+		parsed.Parse(response.data);
+
+		if (parsed.HasParseError())
+		{
+			Log(LogChannel::MARKET, "Ping failed: JSON parsing failed\n");
+			return false;
+		}
+
+		if (!parsed.HasMember("success"))
+		{
+			Log(LogChannel::MARKET, "Ping failed: no success field\n");
+			return false;
+		}
+
+		if (!parsed["success"].GetBool())
+		{
+			const auto iterMessage = parsed.FindMember("message");
+			if (iterMessage != parsed.MemberEnd())
+				Log(LogChannel::MARKET, "Ping failed, received message: %s\n", iterMessage->value.GetString());
+			else
+				Log(LogChannel::MARKET, "Ping failed: request unsucceeded\n");
+
+			return false;
+		}
+
+		return true;
 	}
 
 	bool GetItems(CURL* curl, const char* apiKey, int market, rapidjson::Document* outDoc)
@@ -124,20 +202,25 @@ namespace Market
 	}
 
 	// outOfferId buffer size must be at least offerIdBufSz
-	// outPartnerId64 buffer size must be at least UINT64_MAX_STR_SIZE
-	bool RequestTake(CURL* curl, const char* apiKey, int market, char* outOfferId, char* outPartnerId64)
+	bool RequestTake(CURL* curl, const char* apiKey, int market, const char* partnerId32, char* outOfferId)
 	{
-		Log(LogChannel::MARKET, "[%s] Requesting details to receive items...", marketNames[market]);
+		Log(LogChannel::GENERAL, "[%s] Requesting details to receive items...", marketNames[market]);
 
 		const char query[] = "trade-request-take?key=";
+		const char queryBot[] = "&bot=";
 
-		const size_t urlBufSz = marketBaseUrlMaxSz - 1 + sizeof(query) - 1 + apiKeySz + 1;
+		const size_t urlBufSz =
+			marketBaseUrlMaxSz - 1 + sizeof(query) - 1 + 
+			apiKeySz + sizeof(queryBot) - 1 + 
+			UINT32_MAX_STR_SIZE - 1 + 1;
 		char url[urlBufSz];
 
 		char* urlEnd = url;
 		urlEnd = stpcpy(urlEnd, marketBaseUrls[market]);
 		urlEnd = stpcpy(urlEnd, query);
-		strcpy(urlEnd, apiKey);
+		urlEnd = stpcpy(urlEnd, apiKey);
+		urlEnd = stpcpy(urlEnd, queryBot);
+		strcpy(urlEnd, partnerId32);
 
 		Curl::CResponse response;
 		curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
@@ -168,10 +251,8 @@ namespace Market
 		}
 
 		const char* offerId = parsed["trade"].GetString();
-		const char* partnerUrl = parsed["profile"].GetString();
 
 		strcpy(outOfferId, offerId);
-		stpncpy(outPartnerId64, partnerUrl + 36, strlen(partnerUrl + 36) - 1)[0] = '\0';
 
 		putsnn("ok\n");
 		return true;
@@ -179,7 +260,7 @@ namespace Market
 
 	bool RequestGiveBot(CURL* curl, const char* apiKey, int market, char* outTradeOfferId, char* outPartnerId64)
 	{
-		Log(LogChannel::MARKET, "[%s] Requesting details to send items...", marketNames[market]);
+		Log(LogChannel::GENERAL, "[%s] Requesting details to send items...", marketNames[market]);
 
 		const char query[] = "trade-request-give?key=";
 
@@ -236,7 +317,7 @@ namespace Market
 
 	bool RequestGiveP2PAll(CURL* curl, const char* apiKey, int market, rapidjson::Document* outDoc)
 	{
-		Log(LogChannel::MARKET, "[%s] Requesting details to send items...", marketNames[market]);
+		Log(LogChannel::GENERAL, "[%s] Requesting details to send items...", marketNames[market]);
 
 		const char query[] = "trade-request-give-p2p-all?key=";
 
@@ -277,6 +358,58 @@ namespace Market
 			else
 				putsnn("request unsucceeded\n");
 
+			return false;
+		}
+
+		putsnn("ok\n");
+		return true;
+	}
+	
+	bool TradeReady(CURL* curl, const char* apiKey, int market, const char* tradeOfferId)
+	{
+		Log(LogChannel::GENERAL, "[%s] Registering sent trade offer...", marketNames[market]);
+
+		const char query[] = "trade-ready?key=";
+		const char queryTradeOffer[] = "&tradeoffer=";
+
+		const size_t urlBufSz = 
+			marketBaseUrlMaxSz - 1 + sizeof(query) - 1 +
+			apiKeySz + sizeof(queryTradeOffer) - 1 + 
+			Steam::Trade::offerIdBufSz - 1 + 1;
+		char url[urlBufSz];
+
+		char* urlEnd = url;
+		urlEnd = stpcpy(urlEnd, marketBaseUrls[market]);
+		urlEnd = stpcpy(urlEnd, query);
+		urlEnd = stpcpy(urlEnd, apiKey);
+		urlEnd = stpcpy(urlEnd, queryTradeOffer);
+		strcpy(urlEnd, tradeOfferId);
+
+		Curl::CResponse response;
+		curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
+		curl_easy_setopt(curl, CURLOPT_URL, url);
+		curl_easy_setopt(curl, CURLOPT_HTTPGET, 1L);
+
+		const CURLcode respCode = curl_easy_perform(curl);
+
+		if (respCode != CURLE_OK)
+		{
+			Curl::PrintError(curl, respCode);
+			return false;
+		}
+
+		rapidjson::Document parsed;
+		parsed.ParseInsitu(response.data);
+
+		if (parsed.HasParseError())
+		{
+			putsnn("JSON parsing failed\n");
+			return false;
+		}
+
+		if (!parsed["success"].GetBool())
+		{
+			putsnn("request unsucceeded\n");
 			return false;
 		}
 
@@ -364,6 +497,7 @@ namespace Market
 		return true;
 	}
 
+	// deprecated
 	bool SetSteamApiKey(CURL* curl, const char* marketApiKey, const char* steamApiKey)
 	{
 		Log(LogChannel::MARKET, "Setting Steam API key on the market...");

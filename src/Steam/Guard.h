@@ -167,7 +167,8 @@ namespace Steam
 		}
 
 		// out buffer size must be at least confQueueParamsBufSz
-		bool GenerateConfirmationQueryParams(CURL* curl, const char* steamId64, const char* identitySecret, const char* deviceId, const char* tag, char* out)
+		bool GenerateConfirmationQueryParams(CURL* curl, const char* steamId64, const char* identitySecret, 
+			const char* deviceId, const char* tag, char* out)
 		{
 			const time_t timestamp = GetSteamTime();
 
@@ -196,7 +197,8 @@ namespace Steam
 			return true;
 		}
 
-		bool FetchConfirmations(CURL* curl, const char* steamId64, const char* identitySecret, const char* deviceId, rapidjson::Document* out)
+		bool FetchConfirmations(CURL* curl, const char* steamId64, const char* identitySecret, 
+			const char* deviceId, rapidjson::Document* out)
 		{
 			Log(LogChannel::STEAM, "Fetching confirmations...");
 
@@ -423,7 +425,7 @@ namespace Steam
 			}
 
 			if (confirmedCount != offerIdCount)
-				printf("accepted %u out of %u\n", confirmedCount, offerIdCount);
+				printf("accepted %zu out of %zu\n", confirmedCount, offerIdCount);
 			else
 				putsnn("ok\n");
 

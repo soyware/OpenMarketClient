@@ -4,14 +4,6 @@
 #define BASE64_LINE_SZ 64
 #endif // !BASE64_LINE_SZ
 
-// Source: https://github.com/wolfSSL/wolfssl/blob/master/wolfcrypt/src/coding.c
-constexpr word32 Base64ToPlainSize(size_t inLen)
-{
-	word32 plainSz = inLen - ((inLen + (BASE64_LINE_SZ - 1)) / BASE64_LINE_SZ);
-	plainSz = (plainSz * 3 + 3) / 4;
-	return plainSz;
-}
-
 constexpr word32 PlainToBase64Size(size_t inLen, Escaped escaped)
 {
 	word32 outSz = (inLen + 3 - 1) / 3 * 4;
@@ -27,6 +19,32 @@ constexpr word32 PlainToBase64Size(size_t inLen, Escaped escaped)
 	return outSz;
 }
 
+constexpr word32 Base64ToPlainSize(size_t base64Len, Escaped escaped)
+{
+	word32 lineBreaks = 0;
+
+	if (escaped == WC_ESC_NL_ENC)
+	{
+		// Each line break is encoded as %0A (3 bytes)
+		// So number of line breaks = total encoded newline bytes / 3
+		lineBreaks = (base64Len / (BASE64_LINE_SZ + 3)) * 3;
+	}
+	else if (escaped == WC_NO_NL_ENC)
+		lineBreaks = 0;
+	else
+	{
+		// Default case: plain newlines ('\n' = 1 byte)
+		lineBreaks = base64Len / (BASE64_LINE_SZ + 1);
+	}
+
+	word32 base64DataLen = base64Len - lineBreaks;
+
+	// Each 4 Base64 characters represent 3 bytes of data
+	word32 plainLen = (base64DataLen / 4) * 3;
+
+	return plainLen;
+}
+
 constexpr size_t GetBase64PaddedLen(size_t inLen)
 {
 	size_t outLen = inLen;
@@ -39,7 +57,7 @@ constexpr size_t GetBase64PaddedLen(size_t inLen)
 	return outLen;
 }
 
-void Base64ToBase64URL(char* in, size_t len)
+void Base64URLToBase64(char* in, size_t len)
 {
 	for (size_t i = 0; i < len; ++i)
 	{
@@ -68,7 +86,8 @@ namespace Crypto
 			return false;
 		}
 
-		const bool rngFailed = (wc_RNG_GenerateBlock(&rng, outSalt, outSaltSz) || wc_RNG_GenerateBlock(&rng, outIV, outIVSz));
+		const bool rngFailed = (wc_RNG_GenerateBlock(&rng, outSalt, outSaltSz)
+			|| wc_RNG_GenerateBlock(&rng, outIV, outIVSz));
 
 		wc_FreeRng(&rng);
 
@@ -88,7 +107,8 @@ namespace Crypto
 		Aes aes;
 
 		const bool stretchFailed =
-			(wc_scrypt(key, (byte*)password, strlen(password), outSalt, outSaltSz, scryptCost, scryptBlockSz, scryptParallel, keySz) ||
+			(wc_scrypt(key, (byte*)password, strlen(password),
+				outSalt, outSaltSz, scryptCost, scryptBlockSz, scryptParallel, keySz) ||
 			wc_AesGcmSetKey(&aes, key, keySz));
 
 		free(key);
@@ -99,7 +119,8 @@ namespace Crypto
 			return false;
 		}
 
-		if (wc_AesGcmEncrypt(&aes, outCipher, plaintext, plaintextSz, outIV, outIVSz, outAuthTag, outAuthTagSz, nullptr, 0))
+		if (wc_AesGcmEncrypt(&aes, outCipher, 
+			plaintext, plaintextSz, outIV, outIVSz, outAuthTag, outAuthTagSz, nullptr, 0))
 		{
 			putsnn("encryption failed\n");
 			return false;
@@ -128,7 +149,8 @@ namespace Crypto
 		Aes aes;
 
 		const bool stretchFailed =
-			(wc_scrypt(key, (byte*)password, strlen(password), salt, saltSz, scryptCost, scryptBlockSz, scryptParallel, keySz) ||
+			(wc_scrypt(key, (byte*)password, 
+				strlen(password), salt, saltSz, scryptCost, scryptBlockSz, scryptParallel, keySz) ||
 			wc_AesGcmSetKey(&aes, key, keySz));
 
 		free(key);

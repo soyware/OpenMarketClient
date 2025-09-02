@@ -6,6 +6,19 @@ inline int putsnn(const char* buf)
 	return fputs(buf, stdout);
 }
 
+thread_local const char* g_pszLogAccountName;
+
+class CLoggingContext
+{
+public:
+	CLoggingContext(const char* name) {
+		g_pszLogAccountName = name;
+	}
+	~CLoggingContext() {
+		g_pszLogAccountName = nullptr;
+	}
+};
+
 enum class LogChannel
 {
 	GENERAL,
@@ -14,16 +27,17 @@ enum class LogChannel
 	MARKET
 };
 
-const char* logChannelNames[] =
-{
-	"",
-	"libcurl",
-	"Steam",
-	"Market"
-};
 
 void Log(LogChannel channel, const char* format, ...)
 {
+	const char* logChannelNames[] =
+	{
+		"",
+		"libcurl",
+		"Steam",
+		"Market"
+	};
+
 	const time_t timestamp = time(nullptr);
 
 	// zh_CN.utf8 locale's time on linux looks like this 2022年10月18日 15时08分28秒
@@ -44,6 +58,9 @@ void Log(LogChannel channel, const char* format, ...)
 #endif // _WIN32
 
 	printf("[%s] ", dateTime);
+
+	if (g_pszLogAccountName)
+		printf("[%s] ", g_pszLogAccountName);
 
 	if (channel != LogChannel::GENERAL)
 		printf("[%s] ", logChannelNames[(size_t)channel]);
@@ -249,8 +266,8 @@ bool ReadFile(const char* path, unsigned char** out, long* outSz)
 
 	if (fread(contents, sizeof(unsigned char), fsize, file) != (size_t)fsize)
 	{
-		fclose(file);
 		free(contents);
+		fclose(file);
 		return false;
 	}
 
@@ -312,16 +329,6 @@ void Pause()
 	while ((c = getwchar()) != L'\n' && c != WEOF);
 
 #endif // _WIN32
-}
-
-inline uint64_t SteamID32To64(uint32_t id32)
-{
-	return (id32 | 0x110000100000000);
-}
-
-inline uint32_t SteamID64To32(uint64_t id64)
-{
-	return (id64 & 0xFFFFFFFF);
 }
 
 inline uint32_t byteswap32(uint32_t dw)

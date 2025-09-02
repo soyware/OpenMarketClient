@@ -355,4 +355,41 @@ namespace Steam
 		putsnn("ok\n");
 		return true;
 	}
+
+	// if we don't do this we can't accept trade confirmation
+	bool AcknowledgeTradeProtection(CURL* curl, const char* sessionId)
+	{
+		Log(LogChannel::STEAM, "Acknowledging trade protection...");
+
+		const char postFieldSession[] = "sessionid=";
+		const char postFieldMessage[] = "&message=1";
+
+		const size_t postFieldsBufSz =
+			sizeof(postFieldSession) - 1 + sessionIdBufSz - 1 +
+			sizeof(postFieldMessage) - 1 + 1;
+
+		char postFields[postFieldsBufSz];
+
+		char* postFieldsEnd = postFields;
+		postFieldsEnd = stpcpy(postFieldsEnd, postFieldSession);
+		postFieldsEnd = stpcpy(postFieldsEnd, sessionId);
+		strcpy(postFieldsEnd, postFieldMessage);
+
+		Curl::CResponse response;
+		curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
+		curl_easy_setopt(curl, CURLOPT_URL, "https://steamcommunity.com//trade/new/acknowledge");
+		curl_easy_setopt(curl, CURLOPT_POST, 1L);
+		curl_easy_setopt(curl, CURLOPT_POSTFIELDS, postFields);
+
+		CURLcode respCode = curl_easy_perform(curl);
+
+		if (respCode != CURLE_OK)
+		{
+			Curl::PrintError(curl, respCode);
+			return false;
+		}
+		
+		putsnn("ok\n");
+		return true;
+	}
 }

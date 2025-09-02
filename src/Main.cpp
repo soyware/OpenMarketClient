@@ -6,12 +6,7 @@
 #include "Market.h"
 #include "Account.h"
 
-#define OPENMARKETCLIENT_VERSION "0.4.3"
-
-/*	
-* TODO:
-* better logging
-*/
+#define OPENMARKETCLIENT_VERSION "0.4.4"
 
 void SetLocale()
 {
@@ -34,6 +29,7 @@ void PrintVersion()
 namespace Args
 {
 	bool		newAcc = false;
+	bool		marketUseProxy = false;
 	const char* proxy = nullptr;
 
 	void PrintHelp()
@@ -41,7 +37,9 @@ namespace Args
 		putsnn("Options:\n"
 			"--help\t\t\t\t\t\t\tPrint help\n"
 			"--new\t\t\t\t\t\t\tEnter new account manually\n"
-			"--proxy [scheme://][username:password@]host[:port]\tSet global proxy\n");
+			"--proxy [scheme://][username:password@]host[:port]\tSet global proxy\n"
+			"--market-use-proxy\t\t\t\t\tTell the market to do actions using the proxy"
+				"specified in --proxy, presumably to avoid Steam bans\n");
 	}
 
 	bool Parse(int argc, char** const argv)
@@ -55,6 +53,8 @@ namespace Args
 			}
 			else if (!strcmp(argv[i], "--new"))
 				newAcc = true;
+			else if (!strcmp(argv[i], "--market-use-proxy"))
+				marketUseProxy = true;
 			else if ((i < (argc - 1)) && !strcmp(argv[i], "--proxy")) // check if second to last argument
 			{
 				proxy = argv[i + 1];
@@ -111,7 +111,7 @@ bool InitSavedAccounts(CURL* curl, const char* sessionId, const char* encryptPas
 		const auto* wideFilenameNoExt = stem.c_str();
 
 		char szPath[PATH_MAX];
-		char szFilenameNoExt[sizeof(CAccount::name)];
+		char szFilenameNoExt[PATH_MAX];
 
 		if (!WideCharToMultiByte(CP_UTF8, 0, widePath, -1, szPath, sizeof(szPath), NULL, NULL) ||
 			!WideCharToMultiByte(CP_UTF8, 0, wideFilenameNoExt, -1, szFilenameNoExt, sizeof(szFilenameNoExt), NULL, NULL))
@@ -143,8 +143,7 @@ bool InitSavedAccounts(CURL* curl, const char* sessionId, const char* encryptPas
 int main(int argc, char** argv)
 {
 	// disable stdout buffering if stdout is a terminal
-#pragma warning (suppress:4996)
-	if (isatty(fileno(stdout)))
+	if (_isatty(_fileno(stdout)))
 		setvbuf(stdout, nullptr, _IONBF, 0);
 
 	SetLocale();
@@ -232,12 +231,14 @@ int main(int argc, char** argv)
 	SetThreadExecutionState(ES_CONTINUOUS | ES_SYSTEM_REQUIRED);
 #endif // _WIN32
 
+	const char* marketProxy = Args::marketUseProxy ? Args::proxy : nullptr;
+
 	const size_t accountCount = accounts.size();
 
 	while (true)
 	{
 		for (size_t i = 0; i < accountCount; ++i)
-			accounts[i].RunMarkets(curl, sessionId);
+			accounts[i].RunMarkets(curl, sessionId, marketProxy);
 
 		if (1 < accountCount)
 			putchar('\n');

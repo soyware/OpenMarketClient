@@ -11,6 +11,7 @@
 #include <vector>
 #include <thread>
 #include <filesystem>
+#include <unordered_set>
 
 #ifdef _WIN32
 
@@ -37,6 +38,11 @@
 
 #include <termios.h>
 #include <unistd.h>
+
+#define _isatty isatty
+#define _stat stat
+#define _fstat fstat
+#define _fileno fileno
 
 #include <wolfssl/options.h>
 

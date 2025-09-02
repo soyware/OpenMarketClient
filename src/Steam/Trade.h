@@ -63,7 +63,8 @@ namespace Steam
 			postFieldsEnd = stpcpy(postFieldsEnd, postFieldOffer);
 			strcpy(postFieldsEnd, offerId);
 
-			// Confirmation required: {"tradeid":null,"needs_mobile_confirmation":true,"needs_email_confirmation":true,"email_domain":"gmail.com"}
+			// Confirmation required:
+			// {"tradeid":null,"needs_mobile_confirmation":true,"needs_email_confirmation":true,"email_domain":"gmail.com"}
 			// No confirmation required: {"tradeid":"2251163828378018000"}
 			Curl::CResponse response;
 			curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
@@ -85,7 +86,8 @@ namespace Steam
 		}
 
 		// outOfferId buffer size must be at least offerIdBufSz
-		bool Send(CURL* curl, const char* sessionId, uint32_t nPartnerId32, const char* token, const char* message, const char* assets, char* outOfferId)
+		bool Send(CURL* curl, const char* sessionId, uint32_t nPartnerId32, const char* token, 
+			const char* message, const char* assets, char* outOfferId)
 		{
 			Log(LogChannel::STEAM, "Sending trade offer...");
 
@@ -114,7 +116,8 @@ namespace Steam
 
 			const char postFieldAssets[] = "&json_tradeoffer={\"newversion\":true,\"version\":2,\"me\":{\"assets\":";
 
-			const char postFieldToken[] = ",\"currency\":[],\"ready\":false},\"them\":{\"assets\":[],\"currency\":[],\"ready\":false}}"
+			const char postFieldToken[] = 
+				",\"currency\":[],\"ready\":false},\"them\":{\"assets\":[],\"currency\":[],\"ready\":false}}"
 				"&trade_offer_create_params={\"trade_offer_access_token\":\"";
 
 			const char postFieldMessage[] = "\"}"

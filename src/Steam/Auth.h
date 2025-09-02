@@ -35,7 +35,8 @@ namespace Steam
 		// outHexModulus buffer size must be at least modulusSz * 2
 		// outHexExponent buffer size must be at least exponentSz * 2
 		// outTimestamp buffer size must be at least timestampBufSz
-		bool GetPasswordRSAPublicKey(CURL* curl, const char* escUsername, byte* outHexModulus, byte* outHexExponent, char* outTimestamp)
+		bool GetPasswordRSAPublicKey(CURL* curl, const char* escUsername, 
+			byte* outHexModulus, byte* outHexExponent, char* outTimestamp)
 		{
 			Log(LogChannel::STEAM, "Getting password RSA public key...");
 
@@ -116,7 +117,8 @@ namespace Steam
 
 			byte encrypted[modulusSz];
 
-			const int encryptedSz = wc_RsaPublicEncrypt((byte*)password, strlen(password), encrypted, sizeof(encrypted), &pubKey, &rng);
+			const int encryptedSz = wc_RsaPublicEncrypt((byte*)password, strlen(password), 
+				encrypted, sizeof(encrypted), &pubKey, &rng);
 
 			const bool success = ((0 <= encryptedSz) && !Base64_Encode_NoNl(encrypted, encryptedSz, out, outSz));
 
@@ -130,7 +132,8 @@ namespace Steam
 		// outSteamId64 buffer size must be at least UINT64_MAX_STR_SIZE
 		// outOAuthToken buffer size must be at least oauthTokenBufSz
 		// outLoginToken buffer size must be at least loginTokenBufSz
-		LoginResult DoLogin(CURL* curl, const char* username, const char* password, const char* twoFactorCode, char* outSteamId64, char* outOAuthToken, char* outLoginToken)
+		LoginResult DoLogin(CURL* curl, const char* username, const char* password, 
+			const char* twoFactorCode, char* outSteamId64, char* outOAuthToken, char* outLoginToken)
 		{
 			char* escUsername = curl_easy_escape(curl, username, 0);
 
@@ -378,11 +381,13 @@ namespace Steam
 		// outHexModulus buffer size must be at least modulusSz * 2
 		// outHexExponent buffer size must be at least exponentSz * 2
 		// outTimestamp buffer size must be at least timestampBufSz
-		bool GetPasswordRSAPublicKeyJWT(CURL* curl, const char* escUsername, byte* outHexModulus, byte* outHexExponent, char* outTimestamp)
+		bool GetPasswordRSAPublicKeyJWT(CURL* curl, const char* escUsername, 
+			byte* outHexModulus, byte* outHexExponent, char* outTimestamp)
 		{
 			Log(LogChannel::STEAM, "Getting password RSA public key...");
 
-			const char urlStart[] = "https://api.steampowered.com/IAuthenticationService/GetPasswordRSAPublicKey/v1/?account_name=";
+			const char urlStart[] = 
+				"https://api.steampowered.com/IAuthenticationService/GetPasswordRSAPublicKey/v1/?account_name=";
 
 			// multiple by 3 due to URL encoding
 			const size_t urlBufSz = sizeof(urlStart) - 1 + (usernameBufSz - 1) * 3 + 1;
@@ -436,7 +441,8 @@ namespace Steam
 		// outSteamId64 buffer size must be at least UINT64_MAX_STR_SIZE
 		// outClientId buffer size must be at least clientIdBufSz
 		// outRequestId buffer size must be at least requestIdBufSz
-		bool BeginAuthSessionViaCredentials(CURL* curl, const char* username, const char* password, char* outSteamId64, char* outClientId, char* outRequestId)
+		bool BeginAuthSessionViaCredentials(CURL* curl, const char* username, const char* password, 
+			char* outSteamId64, char* outClientId, char* outRequestId)
 		{
 			byte rsaHexModulus[modulusSz * 2];
 			byte rsaHexExponent[exponentSz * 2];
@@ -506,7 +512,8 @@ namespace Steam
 
 			Curl::CResponse response;
 			curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
-			curl_easy_setopt(curl, CURLOPT_URL, "https://api.steampowered.com/IAuthenticationService/BeginAuthSessionViaCredentials/v1/");
+			curl_easy_setopt(curl, CURLOPT_URL, 
+				"https://api.steampowered.com/IAuthenticationService/BeginAuthSessionViaCredentials/v1/");
 			curl_easy_setopt(curl, CURLOPT_POST, 1L);
 			curl_easy_setopt(curl, CURLOPT_POSTFIELDS, postFields);
 
@@ -553,7 +560,8 @@ namespace Steam
 			return true;
 		}
 
-		bool UpdateAuthSessionWithSteamGuardCode(CURL* curl, const char* steamId64, const char* clientId, const char* twoFactorCode)
+		bool UpdateAuthSessionWithSteamGuardCode(CURL* curl, 
+			const char* steamId64, const char* clientId, const char* twoFactorCode)
 		{
 			Log(LogChannel::STEAM, "Updating auth session with a Steam Guard code...");
 
@@ -578,7 +586,8 @@ namespace Steam
 
 			Curl::CResponse response;
 			curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
-			curl_easy_setopt(curl, CURLOPT_URL, "https://api.steampowered.com/IAuthenticationService/UpdateAuthSessionWithSteamGuardCode/v1/");
+			curl_easy_setopt(curl, CURLOPT_URL, 
+				"https://api.steampowered.com/IAuthenticationService/UpdateAuthSessionWithSteamGuardCode/v1/");
 			curl_easy_setopt(curl, CURLOPT_POST, 1L);
 			curl_easy_setopt(curl, CURLOPT_POSTFIELDS, postFields);
 
@@ -595,7 +604,8 @@ namespace Steam
 		}
 
 		// outRefreshToken and outAccessToken buffer size must be at least jwtBufSz
-		bool PollAuthSessionStatus(CURL* curl, const char* clientId, const char* requestId, char* outRefreshToken, char* outAccessToken)
+		bool PollAuthSessionStatus(CURL* curl, const char* clientId, const char* requestId,
+			char* outRefreshToken, char* outAccessToken)
 		{
 			Log(LogChannel::STEAM, "Polling auth session status...");
 
@@ -620,7 +630,7 @@ namespace Steam
 
 			Curl::CResponse response;
 			curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
-			curl_easy_setopt(curl, CURLOPT_URL, "https://api.steampowered.com/IAuthenticationService/PollAuthSessionStatus/v1/");
+			curl_easy_setopt(curl, CURLOPT_URL,"https://api.steampowered.com/IAuthenticationService/PollAuthSessionStatus/v1/");
 			curl_easy_setopt(curl, CURLOPT_POST, 1L);
 			curl_easy_setopt(curl, CURLOPT_POSTFIELDS, postFields);
 
@@ -686,7 +696,8 @@ namespace Steam
 
 			Curl::CResponse response;
 			curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
-			curl_easy_setopt(curl, CURLOPT_URL, "https://api.steampowered.com/IAuthenticationService/GenerateAccessTokenForApp/v1/");
+			curl_easy_setopt(curl, CURLOPT_URL, 
+				"https://api.steampowered.com/IAuthenticationService/GenerateAccessTokenForApp/v1/");
 			curl_easy_setopt(curl, CURLOPT_POST, 1L);
 			curl_easy_setopt(curl, CURLOPT_POSTFIELDS, postFields);
 
@@ -726,10 +737,12 @@ namespace Steam
 		{
 			Curl::CResponse response;
 			curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
-			curl_easy_setopt(curl, CURLOPT_URL, "https://login.steampowered.com/jwt/refresh?redir=https://steamcommunity.com/");
+			curl_easy_setopt(curl, CURLOPT_URL, 
+				"https://login.steampowered.com/jwt/refresh?redir=https://steamcommunity.com/");
 			curl_easy_setopt(curl, CURLOPT_HTTPGET, 1L);
 
-			// steam returns expiry time "1" for some reason, which makes cookie expire instantly, so we must parse cookie manually
+			// steam returns expiry time "1" for some reason, which makes cookie expire instantly
+			// so we must parse the cookie manually
 			curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 0L);
 
 			const CURLcode respCodeRefresh = curl_easy_perform(curl);

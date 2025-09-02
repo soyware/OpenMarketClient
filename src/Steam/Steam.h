@@ -23,6 +23,16 @@ namespace Steam
 
 		return ::curl_easy_perform(curl);
 	}
+
+	inline uint64_t SteamID32To64(uint32_t id32)
+	{
+		return (id32 | 0x110000100000000);
+	}
+
+	inline uint32_t SteamID64To32(uint64_t id64)
+	{
+		return (id64 & 0xFFFFFFFF);
+	}
 }
 
 #include "Misc.h"
