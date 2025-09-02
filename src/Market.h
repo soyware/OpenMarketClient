@@ -4,7 +4,7 @@ namespace Market
 {
 	const size_t apiKeySz = 31;
 	const size_t hashBufSz = 50;
-	const int offerTTL = (15 * 60);
+	const int offerTTL = (10 * 60);
 
 	enum class Market
 	{
