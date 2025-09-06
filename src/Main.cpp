@@ -1,4 +1,5 @@
 #include "Precompiled.h"
+#include <string>
 #include "Misc.h"
 #include "Curl.h"
 #include "Crypto.h"
@@ -36,30 +37,34 @@ namespace Args
 	{
 		putsnn("Options:\n"
 			"--help\t\t\t\t\t\t\tPrint help\n"
-			"--new\t\t\t\t\t\t\tEnter new account manually\n"
-			"--proxy [scheme://][username:password@]host[:port]\tSet global proxy\n"
-			"--market-use-proxy\t\t\t\t\tTell the market to do actions using the proxy"
-				"specified in --proxy, presumably to avoid Steam bans\n");
+			"--new\t\t\t\t\t\t\tAdd a new account by manually entering the details\n"
+			"--proxy [scheme://][username:password@]host[:port]\tSets the global proxy\n"
+			"--market-use-proxy\t\t\t\t\tTells the market to perform actions using "
+				"the proxy specified in --proxy, presumably to avoid Steam bans\n");
 	}
 
 	bool Parse(int argc, char** const argv)
 	{
 		for (int i = 1; i < argc; ++i)
 		{
-			if (!strcmp(argv[i], "--help"))
+			const char* arg = argv[i];
+
+			if (!strcmp(arg, "--help"))
 			{
 				PrintHelp();
 				return false;
 			}
-			else if (!strcmp(argv[i], "--new"))
+			else if (!strcmp(arg, "--new"))
 				newAcc = true;
-			else if (!strcmp(argv[i], "--market-use-proxy"))
+			else if (!strcmp(arg, "--market-use-proxy"))
 				marketUseProxy = true;
-			else if ((i < (argc - 1)) && !strcmp(argv[i], "--proxy")) // check if second to last argument
+			else if ((i < (argc - 1)) && !strcmp(arg, "--proxy")) // check if second to last argument
 			{
 				proxy = argv[i + 1];
 				++i;
 			}
+			else
+				Log(LogChannel::GENERAL, "Unknown argument: %s\n", arg);
 		}
 		return true;
 	}

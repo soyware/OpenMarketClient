@@ -18,17 +18,17 @@ An unofficial, cross-platform, console-based client for the following markets:
 * Sends sold items
 * Receives bought items
 * Accepts Steam Guard confirmations of sent offers
-* Cancels offers that aren't accepted within 10 minutes (required since Steam removed CancelTradeOffer web API)
-* Ability to import SteamDesktopAuthenticator's maFile
+* Cancels offers that aren't accepted within 10 minutes (required since Steam removed the `CancelTradeOffer` web API)
+* Ability to import Steam Desktop Authenticator's `.maFile`
 * Accounts are password encrypted
 
 # Usage
-You'll be asked to enter the encryption password which will be used to encrypt and decrypt saved accounts.
+You'll be asked to enter an encryption password which will be used to encrypt and decrypt saved accounts.
 
 ## Adding an Account Manually
 If you run the client without any accounts added, you will be asked to add a new one. To add another account later, launch the program with the `--new` command-line option.
 
-## Importing Steam Desktop Authenticator's maFile
+## Importing Steam Desktop Authenticator's .maFile
 To import an account from SDA, place the unencrypted `.maFile` into the `accounts` folder (create the folder if it doesn't exist). The program will automatically import most of the required details.
 
 ## Required Details
@@ -42,8 +42,9 @@ To import an account from SDA, place the unencrypted `.maFile` into the `account
 You can find instructions on how to extract Steam Guard Mobile Authenticator details from your phone [here](https://github.com/JustArchiNET/ArchiSteamFarm/wiki/Two-factor-authentication#android-phone).
 
 ## Command-line Options
-* `--new` - Enter new account manually
-* `--proxy [scheme://][username:password@]host[:port]` - Set global proxy
+* `--new` - Add a new account by manually entering the details
+* `--proxy [scheme://][username:password@]host[:port]` - Sets the global proxy
+* `--market-use-proxy` - Tells the market to perform actions using the proxy specified in `--proxy`, presumably to avoid Steam bans
 
 # Build Requirements
 * C++17 supporting compiler
