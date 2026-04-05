@@ -32,7 +32,7 @@ If you run the client without any accounts added, you will be asked to add a new
 To import an account from SDA, place the unencrypted `.maFile` into the `accounts` folder (create the folder if it doesn't exist). The program will automatically import most of the required details.
 
 ## Required Details
-* Market API key ([you can get one here](https://market.csgo.com/docs-v2))
+* Market API key ([you can get one here](https://market-old.csgo.com/docs-v2))
 * Steam username
 * Steam password
 * Steam Guard Mobile Authenticator details:

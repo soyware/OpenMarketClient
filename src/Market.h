@@ -605,7 +605,7 @@ namespace Market
 	}
 
 	// steam login token must be set when calling this
-	bool SetSteamDetails(CURL* curl, const char* apiKey, const char* steamApiKey)
+	bool SetSteamDetails(CURL* curl, const char* apiKey/*, const char* steamApiKey*/)
 	{
 		rapidjson::Document docTest;
 		if (!GetProfileStatus(curl, apiKey, &docTest))
@@ -613,12 +613,13 @@ namespace Market
 
 		const rapidjson::Value& status = docTest["status"];
 
-		if (!status["steam_web_api_key"].GetBool())
-		{
-			// this fails on the first try sometimes, don't know why
-			if (!SetSteamApiKey(curl, apiKey, steamApiKey) && !SetSteamApiKey(curl, apiKey, steamApiKey))
-				return false;
-		}
+		// no longer required, request fails
+		//if (!status["steam_web_api_key"].GetBool())
+		//{
+		//	// this fails on the first try sometimes, don't know why
+		//	if (!SetSteamApiKey(curl, apiKey, steamApiKey) && !SetSteamApiKey(curl, apiKey, steamApiKey))
+		//		return false;
+		//}
 
 		if (!status["user_token"].GetBool())
 		{

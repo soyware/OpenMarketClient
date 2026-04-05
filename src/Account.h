@@ -463,7 +463,7 @@ public:
 		if (!Steam::AcknowledgeTradeProtection(curl, sessionId))
 			return false;
 
-		if (!Market::SetSteamDetails(curl, marketApiKey, steamApiKey))
+		if (!Market::SetSteamDetails(curl, marketApiKey/*, steamApiKey*/))
 			return false;
 
 		if (!Market::CanSell(curl, marketApiKey))
