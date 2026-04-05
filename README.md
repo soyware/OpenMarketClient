@@ -13,7 +13,7 @@ An unofficial, cross-platform, console-based client for the following markets:
 * Multi-account support
 * Proxy support
 * Sets Steam inventory public
-* Sets trade token and Steam web API key on the market
+* Sets Steam trade token on the market
 * Keeps your market profile online
 * Sends sold items
 * Receives bought items
