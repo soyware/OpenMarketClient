@@ -470,11 +470,12 @@ namespace Market
 
 		const rapidjson::Value& status = docTest["status"];
 
-		if (!status["steam_web_api_key"].GetBool())
-		{
-			Log(LogChannel::MARKET, "Can't sell on the market: Steam web API key not set\n");
-			return false;
-		}
+		// steam_web_api_key is no longer required by the market
+		//if (!status["steam_web_api_key"].GetBool())
+		//{
+		//	Log(LogChannel::MARKET, "Can't sell on the market: Steam web API key not set\n");
+		//	return false;
+		//}
 
 		if (!status["user_token"].GetBool())
 		{
